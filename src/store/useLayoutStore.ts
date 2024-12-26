@@ -3,13 +3,12 @@ import { create } from 'zustand';
 import { NodeTreeTabsType } from '@/types';
 import {
   closeTab,
-  customMoveTabInNewSplittedTabs,
-  customMoveTabToNewStack,
-  customMoveTabToNewStackNew,
+  moveTabIntoNewSplitted,
+  moveTabToStack,
+  moveTabToStackAtIndex,
   updateActiveTab,
 } from '@/lib/helpers';
 
-// Descrivi la forma dello stato e delle azioni disponibili
 interface LayoutState {
   layout: NodeTreeTabsType;
   setLayout: (updater: (draft: NodeTreeTabsType) => void) => void;
@@ -127,19 +126,19 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
 
   handleMoveTabToNewStack: (tabId, targetStackId) => {
     get().setLayout((draft) => {
-      customMoveTabToNewStack(draft, tabId, targetStackId);
+      moveTabToStack(draft, tabId, targetStackId);
     });
   },
 
   handleMoveTabInNewSplittedTabs: (tabId, targetSplitId, position) => {
     get().setLayout((draft) => {
-      customMoveTabInNewSplittedTabs(draft, tabId, targetSplitId, position);
+      moveTabIntoNewSplitted(draft, tabId, targetSplitId, position);
     });
   },
 
   handleMoveTabToNewStackNew: (tabId, targetStackId, position) => {
     get().setLayout((draft) => {
-      customMoveTabToNewStackNew(draft, tabId, targetStackId, position);
+      moveTabToStackAtIndex(draft, tabId, targetStackId, position);
     });
   },
 }));

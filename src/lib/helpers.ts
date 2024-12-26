@@ -1,11 +1,14 @@
 // helpers.ts
 import { NodeTreeTabsType, SplittedTabsType, TabStackType, TabType } from '@/types';
-import { v4 as uuidv4 } from 'uuid';
-
-// FIXME: nella remove devo settare un nuovo activeTabIndex se quello attuale è maggiore o uguale alla lunghezza delle tabs
 
 // TODO: controllare se la tab che voglio spostare è già all'interno della tabStack di destinazione
 
+// ========================================================
+// updateActiveTab
+// ========================================================
+/**
+ * Aggiorna l’activeTabIndex in un determinato stack (stackId) in base al tabId da attivare.
+ */
 export const updateActiveTab = (
   node: NodeTreeTabsType,
   stackId: string,
@@ -21,6 +24,13 @@ export const updateActiveTab = (
   }
 };
 
+// ========================================================
+// closeTab
+// ========================================================
+/**
+ * Chiude una tab specifica in uno stack. Se lo stack diventa vuoto, viene rimosso dal suo genitore.
+ * Ricalcola poi gli splitPercentages se necessario.
+ */
 export const closeTab = (
   node: NodeTreeTabsType,
   stackId: string,
@@ -30,19 +40,28 @@ export const closeTab = (
     const tabIndex = node.tabs.findIndex((tab) => tab.id === tabId);
     if (tabIndex !== -1) {
       node.tabs.splice(tabIndex, 1);
-      if (node.activeTabIndex && node.activeTabIndex >= node.tabs.length) {
+
+      // Se è vuoto, restituiamo "true" => segnala al padre di rimuoverlo.
+      if (node.tabs.length === 0) {
+        return true;
+      }
+
+      // Se l'activeTabIndex va oltre la lunghezza attuale, lo riduciamo
+      if (node.activeTabIndex != null && node.activeTabIndex >= node.tabs.length) {
         node.activeTabIndex = node.tabs.length - 1;
       }
-      return node.tabs.length === 0;
     }
   } else if (node.type === 'splittedTabs') {
     for (let i = 0; i < node.nodeTreeTabs.length; i++) {
       const child = node.nodeTreeTabs[i];
       const isEmpty = closeTab(child, stackId, tabId);
+
       if (isEmpty) {
+        // Rimuove il figlio vuoto
         node.nodeTreeTabs.splice(i, 1);
         node.splitPercentages.splice(i, 1);
-        simplifySplittedTabs(node);
+
+        recalcSplitPercentages(node);
         i--;
       }
     }
@@ -50,176 +69,206 @@ export const closeTab = (
   return false;
 };
 
+/**
+ * Ricalcola in modo uniforme le splitPercentages per un splittedTabs,
+ * in modo che ogni child abbia la stessa fetta di spazio.
+ */
+function recalcSplitPercentages(node: SplittedTabsType) {
+  if (node.nodeTreeTabs.length === 0) {
+    node.splitPercentages = [];
+    return;
+  }
+  const equalShare = 100 / node.nodeTreeTabs.length;
+  node.splitPercentages = Array(node.nodeTreeTabs.length).fill(equalShare);
+}
 
-export const customMoveTabToNewStack = (
+// ========================================================
+// moveTabToStack (ex customMoveTabToNewStack)
+// ========================================================
+/**
+ * Sposta la tab (tabId) in un altro stack (targetStackId), aggiungendola in coda.
+ * Se il vecchio stack diventa vuoto, viene rimosso.
+ */
+export const moveTabToStack = (
   root: NodeTreeTabsType,
   tabId: string,
   targetStackId: string
 ): void => {
-  console.log('customMoveTabToNewStack', root, tabId, targetStackId);
+  const tabToMove = removeTabAndReturnIt(root, tabId, targetStackId);
+  if (!tabToMove) return;
 
+  // Aggiungiamo la tab in coda allo stack target
+  const addTabToStack = (node: NodeTreeTabsType): boolean => {
+    if (node.type === 'tabStack' && node.id === targetStackId) {
+      node.tabs.push(tabToMove);
+      node.activeTabIndex = node.tabs.length - 1;
+      return true;
+    } else if (node.type === 'splittedTabs') {
+      return node.nodeTreeTabs.some(addTabToStack);
+    }
+    return false;
+  };
 
-  const tabToMove = findRemoveAndSemplify(root, tabId);
-
-  if (tabToMove) {
-    const addTabToStack = (node: NodeTreeTabsType): boolean => {
-      if (node.type === 'tabStack' && node.id === targetStackId) {
-        node.tabs.push(tabToMove);
-        node.activeTabIndex = node.tabs.length - 1;
-        return true;
-      } else if (node.type === 'splittedTabs') {
-        return node.nodeTreeTabs.some(addTabToStack);
-      }
-      return false;
-    };
-
-    addTabToStack(root);
-  }
+  addTabToStack(root);
 };
 
-const findRemoveAndSemplify = (node: NodeTreeTabsType, tabId: string): TabType | null => {
-
-  if (node.type === 'tabStack') { /// return tab if found, otherwise null
-    const tabIndex = node.tabs.findIndex(tab => tab.id === tabId);
-    if (tabIndex !== -1) {
-      node.activeTabIndex = tabIndex - 1 > 0 ? tabIndex - 1 : 0;
-
-      return node.tabs.splice(tabIndex, 1)[0];
-    }
-  } else if (node.type === 'splittedTabs') {
-
-    for (let i = 0; i < node.nodeTreeTabs.length; i++) {
-
-      const removedTab = findRemoveAndSemplify(node.nodeTreeTabs[i], tabId);
-
-      if (removedTab) {
-        if (node.nodeTreeTabs[i].type === 'tabStack' && (node.nodeTreeTabs[i] as TabStackType).tabs.length === 0) {
-          node.nodeTreeTabs.splice(i, 1);
-          if (node.nodeTreeTabs.length > 0) { // Se ci sono ancora figli
-            node.splitPercentages = Array(node.nodeTreeTabs.length).fill(100 / node.nodeTreeTabs.length);
-          } else {
-            node.splitPercentages = [];
-          }
-        } else if (node.nodeTreeTabs[i].type === 'splittedTabs' && (node.nodeTreeTabs[i] as SplittedTabsType).nodeTreeTabs.length === 0) {
-          node.nodeTreeTabs.splice(i, 1);
-          if (node.nodeTreeTabs.length > 0) { // Se ci sono ancora figli
-            node.splitPercentages = Array(node.nodeTreeTabs.length).fill(100 / node.nodeTreeTabs.length);
-          } else {
-            node.splitPercentages = [];
-          }
-        }
-        return removedTab;
-      }
-    }
-    // TODO: Think how to simplify the splittedTabs
-  }
-
-  return null;
-}
-
-export const customMoveTabInNewSplittedTabs = (
-  root: NodeTreeTabsType,
-  tabId: string,
-  targetSplitId: string,
-  position: 'top' | 'bottom' | 'left' | 'right'
-): void => {
-
-  const tabToMove = findRemoveAndSemplify(root, tabId);
-
-  if (tabToMove) {
-    const addTabToSplit = (node: NodeTreeTabsType): boolean => {
-      if (node.type === 'tabStack' && node.id === targetSplitId) {
-        const newTabStack: TabStackType = {
-          type: 'tabStack',
-          id: `stack-${ uuidv4() }`,
-          tabs: [tabToMove],
-          activeTabIndex: 0,
-        };
-
-        const newSplit: SplittedTabsType = {
-          type: 'splittedTabs',
-          id: `split-${ uuidv4() }`,
-          direction:
-            position === 'top' || position === 'bottom' ? 'vertical' : 'horizontal',
-          nodeTreeTabs: [],
-          splitPercentages: [],
-        };
-
-        if (position === 'top' || position === 'left') {
-          newSplit.nodeTreeTabs = [newTabStack, { ...node }];
-          newSplit.splitPercentages = [50, 50]; // Inizializza splitPercentages
-        } else {
-          newSplit.nodeTreeTabs = [{ ...node }, newTabStack];
-          newSplit.splitPercentages = [50, 50]; // Inizializza splitPercentages
-        }
-
-        Object.assign(node, newSplit);
-
-        return true;
-      } else if (node.type === 'splittedTabs' && node.id === targetSplitId) {
-        const newTabStack: TabStackType = {
-          type: 'tabStack',
-          id: `stack-${ uuidv4() }`,
-          tabs: [tabToMove],
-          activeTabIndex: 0,
-        };
-
-        if (position === 'top' || position === 'left') {
-          node.nodeTreeTabs.unshift(newTabStack);
-          node.splitPercentages = Array(node.nodeTreeTabs.length).fill(100 / node.nodeTreeTabs.length);
-        } else {
-          node.nodeTreeTabs.push(newTabStack);
-          node.splitPercentages = Array(node.nodeTreeTabs.length).fill(100 / node.nodeTreeTabs.length);
-        }
-
-        return true;
-
-      } else if (node.type === 'splittedTabs') {
-        return node.nodeTreeTabs.some(addTabToSplit);
-      }
-      return false;
-    };
-
-    console.log(addTabToSplit(root));
-  }
-
-}
-
-export const customMoveTabToNewStackNew = (
+// ========================================================
+// moveTabToStackAtIndex (ex customMoveTabToNewStackNew)
+// ========================================================
+/**
+ * Sposta la tab (tabId) nello stack (targetStackId), inserendola in una posizione specifica "position".
+ * Se il vecchio stack diventa vuoto, viene rimosso.
+ */
+export const moveTabToStackAtIndex = (
   root: NodeTreeTabsType,
   tabId: string,
   targetStackId: string,
   position: number
 ): void => {
-  const tabToMove = findRemoveAndSemplify(root, tabId);
+  const tabToMove = removeTabAndReturnIt(root, tabId, targetStackId);
+  if (!tabToMove) return;
 
-  if (tabToMove) {
-    const addTabToStack = (node: NodeTreeTabsType): boolean => {
-      if (node.type === 'tabStack' && node.id === targetStackId) {
-        node.tabs.splice(position, 0, tabToMove);
-        node.activeTabIndex = position;
-        return true;
-      } else if (node.type === 'splittedTabs') {
-        return node.nodeTreeTabs.some(addTabToStack);
+  const addTabToStack = (node: NodeTreeTabsType): boolean => {
+    if (node.type === 'tabStack' && node.id === targetStackId) {
+      node.tabs.splice(position, 0, tabToMove);
+      node.activeTabIndex = position;
+      return true;
+    } else if (node.type === 'splittedTabs') {
+      return node.nodeTreeTabs.some(addTabToStack);
+    }
+    return false;
+  };
+
+  addTabToStack(root);
+};
+
+// ========================================================
+// moveTabIntoNewSplitted (ex customMoveTabInNewSplittedTabs)
+// ========================================================
+/**
+ * Sposta la tab (tabId) e crea un nuovo splitted attorno a "targetSplitId",
+ * posizionando la tab spostata in un nuovo stack "top/bottom/left/right".
+ * Se il vecchio stack diventa vuoto, viene rimosso.
+ */
+export const moveTabIntoNewSplitted = (
+  root: NodeTreeTabsType,
+  tabId: string,
+  targetSplitId: string,
+  position: 'top' | 'bottom' | 'left' | 'right'
+): void => {
+  const tabToMove = removeTabAndReturnIt(root, tabId, targetSplitId);
+  if (!tabToMove) return;
+
+  const addTabToSplit = (node: NodeTreeTabsType): boolean => {
+    // Se targetSplitId è un tabStack => trasformalo in splitted
+    if (node.type === 'tabStack' && node.id === targetSplitId) {
+      // Creiamo un nuovo stack con la tab
+      const newTabStack: TabStackType = {
+        type: 'tabStack',
+        id: 'stack-new', // se vuoi un ID univoco, generane uno, ma non random ogni volta
+        tabs: [tabToMove],
+        activeTabIndex: 0,
+      };
+
+      // Costruiamo lo splitted "in-place", riusando lo stesso "node.id"
+      const newSplitted: SplittedTabsType = {
+        type: 'splittedTabs',
+        id: node.id,  // Riusiamo l’ID del vecchio stack
+        direction: (position === 'top' || position === 'bottom') ? 'vertical' : 'horizontal',
+        nodeTreeTabs: [],
+        splitPercentages: [50, 50],
+      };
+
+      // Ordine
+      if (position === 'top' || position === 'left') {
+        newSplitted.nodeTreeTabs = [newTabStack, { ...node }];
+      } else {
+        newSplitted.nodeTreeTabs = [{ ...node }, newTabStack];
       }
-      return false;
-    };
 
-    addTabToStack(root);
-  }
+      // "Sostituiamo" in-place
+      const splittedNode = node as unknown as SplittedTabsType;
+      splittedNode.type = newSplitted.type;
+      splittedNode.id = newSplitted.id;
+      splittedNode.direction = newSplitted.direction;
+      splittedNode.nodeTreeTabs = newSplitted.nodeTreeTabs;
+      splittedNode.splitPercentages = newSplitted.splitPercentages;
+
+      return true;
+    }
+    // Se targetSplitId è splitted => aggiungi un nuovo stack
+    else if (node.type === 'splittedTabs' && node.id === targetSplitId) {
+      const newTabStack: TabStackType = {
+        type: 'tabStack',
+        id: 'stack-new',
+        tabs: [tabToMove],
+        activeTabIndex: 0,
+      };
+
+      if (position === 'top' || position === 'left') {
+        node.nodeTreeTabs.unshift(newTabStack);
+      } else {
+        node.nodeTreeTabs.push(newTabStack);
+      }
+      recalcSplitPercentages(node);
+      return true;
+    } else if (node.type === 'splittedTabs') {
+      return node.nodeTreeTabs.some(addTabToSplit);
+    }
+    return false;
+  };
+
+  addTabToSplit(root);
 };
 
-
-const simplifySplittedTabs = (node: NodeTreeTabsType): void => { // TODO: valutare questo
-  if (node.type === 'splittedTabs' && node.nodeTreeTabs.length === 1) {
-    const onlyChild = node.nodeTreeTabs[0];
-
-    // Rimuovi tutte le proprietà esistenti dal nodo
-    Object.keys(node).forEach((key) => {
-      delete (node as any)[key];
-    });
-
-    // Assegna tutte le proprietà dal figlio unico al nodo
-    Object.assign(node, onlyChild);
+// ========================================================
+// removeTabAndReturnIt (ex findRemoveAndSemplify)
+// ========================================================
+/**
+ * Rimuove la tab "tabId" dall’albero e la restituisce.
+ * Se un tabStack diventa vuoto, lo rimuove dal padre.
+ * Non fa "semplificazioni" ulteriori.
+ */
+function removeTabAndReturnIt(node: NodeTreeTabsType, tabId: string, skipRemoveId?: string): TabType | null {
+  if (node.type === 'tabStack') {
+    const tabIndex = node.tabs.findIndex(tab => tab.id === tabId);
+    if (tabIndex !== -1) {
+      const removedTab = node.tabs.splice(tabIndex, 1)[0];
+      // Aggiorniamo activeTabIndex
+      if (node.activeTabIndex != null && node.activeTabIndex >= node.tabs.length) {
+        node.activeTabIndex = Math.max(0, node.tabs.length - 1);
+      }
+      return removedTab;
+    }
+  } else if (node.type === 'splittedTabs') {
+    for (let i = 0; i < node.nodeTreeTabs.length; i++) {
+      const child = node.nodeTreeTabs[i];
+      const removedTab = removeTabAndReturnIt(child, tabId, skipRemoveId);
+      if (removedTab) {
+        // Se "child" è rimasto vuoto, rimuoviamo il child
+        if (isNodeEmpty(child)) { // && child.id !== skipRemoveId // TODO: fix this
+          node.nodeTreeTabs.splice(i, 1);
+          node.splitPercentages.splice(i, 1);
+          recalcSplitPercentages(node);
+          i--;
+        }
+        return removedTab;
+      }
+    }
   }
-};
+  return null;
+}
+
+/**
+ * Determina se un nodo (stack o splitted) è vuoto:
+ * - stack -> no tabs
+ * - splitted -> no children
+ */
+function isNodeEmpty(node: NodeTreeTabsType): boolean {
+  if (node.type === 'tabStack') {
+    return node.tabs.length === 0;
+  } else {
+    return node.nodeTreeTabs.length === 0;
+  }
+}
+
