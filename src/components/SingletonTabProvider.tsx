@@ -10,9 +10,10 @@ import {
 import { CustomComponent } from '@/components/tab-manager/CustomComponent';
 import GraphComponent from "@/components/GraphComponent";
 import ControlPanel from "@/components/control-panel";
+import { DebugTab } from "@/components/DebugTab.tsx";
 
 const Tab1Content = () => <div>Contenuto della Tab 1</div>;
-const Tab2Content = () => <div>Contenuto della Tab 2</div>;
+// const Tab2Content = () => <div>Contenuto della Tab 2</div>;
 
 export function SingletonTabProvider() {
 
@@ -25,7 +26,7 @@ export function SingletonTabProvider() {
 
       {/* Tab2: */ }
       <Tab2Teleporter.Source>
-        <Tab2Content/>
+        <DebugTab/>
       </Tab2Teleporter.Source>
 
       {/* Tab3: */ }

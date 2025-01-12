@@ -1,37 +1,28 @@
 use crate::error::NetworkError;
 use crate::network::state::NetworkState;
-use log::info;
 use parking_lot::Mutex;
 use serde_json::json;
 use std::sync::Arc;
 use tauri::State;
-use wg_2024::config::Config;
 
+/// Loads the configuration from a file and stores it in `state.initial_config`.
 #[tauri::command]
 pub fn load_config(
     path: String,
     state: State<Arc<Mutex<NetworkState>>>,
 ) -> Result<(), NetworkError> {
-    // Read the config file
-    let config_data =
-        std::fs::read_to_string(&path).map_err(NetworkError::ConfigFileReadError)?;
-
-    // Parse the TOML config
-    let config: Config =
-        toml::from_str(&config_data).map_err(NetworkError::ConfigParseError)?;
-
-    // Lock the state and load the configuration
-    let mut state = state.lock();
-    state.load_config(config)?;
-
-    info!("Config loaded successfully");
+    let mut net_state = state.lock();
+    net_state.load_config_from_file(&path)?;
     Ok(())
 }
+
+/// Returns the configuration **as originally loaded**, in JSON form.
+/// This does *not* reflect runtime changes like added/removed links.
 #[tauri::command]
 pub fn get_config(state: State<Arc<Mutex<NetworkState>>>) -> serde_json::Value {
     let state = state.lock();
 
-    if let Some(config) = &state.config {
+    if let Some(config) = &state.initial_config {
         json!({
             "drones": config.drone.iter().map(|d| {
                 json!({
@@ -54,6 +45,7 @@ pub fn get_config(state: State<Arc<Mutex<NetworkState>>>) -> serde_json::Value {
             }).collect::<Vec<_>>(),
         })
     } else {
+        // If no initial_config is loaded, return an empty structure
         json!({
             "drones": [],
             "clients": [],
