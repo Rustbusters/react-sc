@@ -1,348 +1,248 @@
+"use client";
+
 import * as React from "react";
-import { FileText, HardDrive, Loader2, PlayCircle, Smile, StopCircle, User, Wifi, } from "lucide-react";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Button } from "@/components/ui/button";
 import {
   CommandDialog,
-  CommandEmpty,
   CommandGroup,
   CommandHeader,
   CommandInput,
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { invoke } from "@tauri-apps/api/core";
-import { Button } from "@/components/ui/button";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { invoke } from "@tauri-apps/api/core";
+import { FileText, HardDrive, Loader2, PlayCircle, Smile, StopCircle, User, Wifi } from "lucide-react";
+
+const commandSchemas = {
+  start_network: null,
+  stop_network: null,
+  add_edge: z.object({
+    droneId: z.string().min(1, "Drone ID is required"),
+    target_id: z.string().min(1, "Target ID is required"),
+  }),
+  remove_edge: z.object({
+    droneId: z.string().min(1, "Drone ID is required"),
+    target_id: z.string().min(1, "Target ID is required"),
+  }),
+  set_pdr: z.object({
+    drone_id: z.string().min(1, "Drone ID is required"),
+    pdr: z
+      .string()
+      .refine((value) => !isNaN(Number(value)), "PDR must be a number")
+      .refine((value) => Number(value) >= 0 && Number(value) <= 100, "PDR must be between 0 and 100"),
+  }),
+  crash_drone: z.object({
+    droneId: z.string().min(1, "Drone ID is required"),
+  }),
+  load_config: z.object({
+    path: z.string().min(1, "Path is required"),
+  }),
+  get_config: null,
+};
+
+const getDefaultValues = (command: keyof typeof commandSchemas | null) => {
+  if (!command || !commandSchemas[command]) return {};
+
+  const schema = commandSchemas[command];
+  if (!schema) return {};
+
+  // Inizializza i valori di default in base al tipo di campo
+  const defaultValues: Record<string, string> = {};
+  Object.keys(schema.shape || {}).forEach((field) => {
+    defaultValues[field] = "";
+  });
+
+  return defaultValues;
+};
+
+const commandGroups = [
+  {
+    heading: "Network",
+    commands: [
+      { key: "start_network", label: "Start Network", icon: <Wifi className="mr-2"/> },
+      { key: "stop_network", label: "Stop Network", icon: <StopCircle className="mr-2"/> },
+    ],
+  },
+  {
+    heading: "Simulation",
+    commands: [
+      { key: "add_edge", label: "Add Edge", icon: <User className="mr-2"/> },
+      { key: "remove_edge", label: "Remove Edge", icon: <User className="mr-2"/> },
+      { key: "set_pdr", label: "Set PDR", icon: <Smile className="mr-2"/> },
+      { key: "crash_drone", label: "Crash Drone", icon: <PlayCircle className="mr-2"/> },
+    ],
+  },
+  {
+    heading: "Config",
+    commands: [
+      { key: "load_config", label: "Load Config", icon: <HardDrive className="mr-2"/> },
+      { key: "get_config", label: "Get Config", icon: <FileText className="mr-2"/> },
+    ],
+  },
+];
 
 export function Raycast() {
   const [open, setOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
-  const [activeScreen, setActiveScreen] = React.useState<"main" | "params">(
-    "main"
-  );
-  const [selectedCommand, setSelectedCommand] = React.useState<string | null>(
-    null
-  );
-  const [params, setParams] = React.useState({
-    drone_id: "",
-    target_id: "",
-    pdr: "",
-    path: "",
+  const [activeScreen, setActiveScreen] = React.useState<"main" | "params">("main");
+  const [selectedCommand, setSelectedCommand] = React.useState<keyof typeof commandSchemas | null>(null);
+
+  const form = useForm({
+    resolver: zodResolver(commandSchemas[selectedCommand ?? "add_edge"] ?? z.object({})),
+    defaultValues: getDefaultValues(selectedCommand),
+    mode: "onSubmit",
   });
+
+  React.useEffect(() => {
+    if (selectedCommand) {
+      form.reset(getDefaultValues(selectedCommand));
+    }
+  }, [selectedCommand, form]);
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === "j" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        setOpen((open) => !open);
+        setOpen((prev) => !prev);
       }
     };
-
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
   }, []);
 
-  const executeCommand = async (cmd?: string) => {
+  const executeCommand = async (data: any) => {
     try {
       setLoading(true);
-      // Use the passed command or fall back to selectedCommand
-      const commandToExecute = cmd ?? selectedCommand;
-      
-      if (!commandToExecute) {
-        console.error("No command selected");
-        return;
-      }
 
-      switch (commandToExecute) {
+      switch (selectedCommand) {
         case "start_network":
         case "stop_network":
         case "get_config":
-          await invoke(commandToExecute);
+          await invoke(selectedCommand!);
           break;
-
         case "add_edge":
-          await invoke("send_add_sender_command", {
-            drone_id: parseInt(params.drone_id, 10),
-            target_id: parseInt(params.target_id, 10),
-          });
-          break;
-
         case "remove_edge":
-          await invoke("send_remove_sender_command", {
-            drone_id: parseInt(params.drone_id, 10),
-            target_id: parseInt(params.target_id, 10),
+          await invoke(selectedCommand!, {
+            droneId: parseInt(data.droneId, 10),
+            target_id: parseInt(data.target_id, 10),
           });
           break;
-
         case "set_pdr":
           await invoke("send_set_pdr_command", {
-            drone_id: parseInt(params.drone_id, 10),
-            pdr: parseFloat(params.pdr),
+            drone_id: parseInt(data.drone_id, 10),
+            pdr: Number(data.pdr), // Converte la stringa in numero
           });
           break;
-
         case "crash_drone":
           await invoke("send_crash_command", {
-            drone_id: parseInt(params.drone_id, 10),
+            droneId: parseInt(data.droneId, 10),
           });
           break;
-
         case "load_config":
-          await invoke("load_config", { path: params.path });
+          await invoke("load_config", { path: data.path });
           break;
-
         default:
           throw new Error("Unknown command");
       }
 
-      setOpen(false);
-      setActiveScreen("main");
-      setSelectedCommand(null);
+      resetState();
     } catch (error) {
-      console.error(`Failed to execute ${cmd ?? selectedCommand}:`, error);
+      console.error(`Failed to execute ${ selectedCommand }:`, error);
     } finally {
       setLoading(false);
-      setParams({
-        drone_id: "",
-        target_id: "",
-        pdr: "",
-        path: "",
-      });
     }
   };
 
+  const resetState = () => {
+    setOpen(false);
+    setActiveScreen("main");
+    setSelectedCommand(null);
+    form.reset(getDefaultValues(selectedCommand)); // Passa i defaultValues corretti
+  };
+
   const renderParamsForm = () => {
-    switch (selectedCommand) {
-      case "add_edge":
-      case "remove_edge":
-        return (
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="drone_id">Drone ID</Label>
-              <Input
-                id="drone_id"
-                type="number"
-                value={ params.drone_id }
-                onChange={ (e) =>
-                  setParams({ ...params, drone_id: e.target.value })
-                }
-                placeholder="Enter drone ID"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="target_id">Target ID</Label>
-              <Input
-                id="target_id"
-                type="number"
-                value={ params.target_id }
-                onChange={ (e) =>
-                  setParams({ ...params, target_id: e.target.value })
-                }
-                placeholder="Enter target ID"
-              />
-            </div>
-          </div>
-        );
+    if (!selectedCommand || !commandSchemas[selectedCommand]) return null;
 
-      case "set_pdr":
-        return (
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="drone_id">Drone ID</Label>
-              <Input
-                id="drone_id"
-                type="number"
-                value={ params.drone_id }
-                onChange={ (e) =>
-                  setParams({ ...params, drone_id: e.target.value })
-                }
-                placeholder="Enter drone ID"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="pdr">PDR</Label>
-              <Input
-                id="pdr"
-                type="number"
-                step="0.01"
-                min="0"
-                max="1"
-                value={ params.pdr }
-                onChange={ (e) => setParams({ ...params, pdr: e.target.value }) }
-                placeholder="Enter PDR (0-1)"
-              />
-            </div>
-          </div>
-        );
-
-      case "crash_drone":
-        return (
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="drone_id">Drone ID</Label>
-              <Input
-                id="drone_id"
-                type="number"
-                value={ params.drone_id }
-                onChange={ (e) =>
-                  setParams({ ...params, drone_id: e.target.value })
-                }
-                placeholder="Enter drone ID"
-              />
-            </div>
-          </div>
-        );
-
-      case "load_config":
-        return (
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="path">Config Path</Label>
-              <Input
-                id="path"
-                type="text"
-                value={ params.path }
-                onChange={ (e) => setParams({ ...params, path: e.target.value }) }
-                placeholder="Enter config path"
-              />
-            </div>
-          </div>
-        );
-
-      default:
-        return null;
-    }
+    return (
+      <Form { ...form }>
+        <form onSubmit={ form.handleSubmit(executeCommand) } className="space-y-4">
+          { Object.keys(commandSchemas[selectedCommand].shape || {}).map((field) => (
+            <FormField
+              key={ field }
+              control={ form.control }
+              name={ field }
+              render={ ({ field: formField }) => (
+                <FormItem>
+                  <FormLabel>
+                    { field === "pdr" ? "PDR (%)" : field.replace("_", " ").toUpperCase() }
+                  </FormLabel>
+                  <FormControl>
+                    <Input
+                      { ...formField }
+                      type={ field === "pdr" ? "text" : "number" }
+                      placeholder={ field === "pdr" ? "Enter PDR (0-100%)" : `Enter ${ field }` }
+                    />
+                  </FormControl>
+                  <FormMessage/>
+                </FormItem>
+              ) }
+            />
+          )) }
+          <Button type="submit" disabled={ loading } className="min-w-[100px]">
+            { loading ? <Loader2 className="h-4 w-4 animate-spin"/> : "Execute" }
+          </Button>
+        </form>
+      </Form>
+    );
   };
 
   return (
     <CommandDialog
       open={ open }
-      onOpenChange={ (open) => {
-        setOpen(open);
-        if (!open) {
-          setActiveScreen("main");
-          setSelectedCommand(null);
-          setParams({
-            drone_id: "",
-            target_id: "",
-            pdr: "",
-            path: "",
-          });
-        }
+      onOpenChange={ (isOpen) => {
+        if (!isOpen) resetState();
+        setOpen(isOpen);
       } }
     >
       { activeScreen === "main" ? (
         <>
           <CommandInput placeholder="Type a command or search..."/>
           <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
-            <CommandGroup heading="Network">
-              <CommandItem
-                onSelect={ () => {
-                  setSelectedCommand("start_network");
-                  executeCommand("start_network");
-                } }
-              >
-                <Wifi className="mr-2"/>
-                Start Network
-              </CommandItem>
-              <CommandItem
-                onSelect={ () => {
-                  setSelectedCommand("stop_network");
-                  executeCommand("stop_network");
-                } }
-              >
-                <StopCircle className="mr-2"/>
-                Stop Network
-              </CommandItem>
-            </CommandGroup>
-            <CommandGroup heading="Simulation">
-              <CommandItem
-                onSelect={ () => {
-                  setSelectedCommand("add_edge");
-                  setActiveScreen("params");
-                } }
-              >
-                <User className="mr-2"/>
-                Add Edge
-              </CommandItem>
-              <CommandItem
-                onSelect={ () => {
-                  setSelectedCommand("remove_edge");
-                  setActiveScreen("params");
-                } }
-              >
-                <User/>
-                Remove Edge
-              </CommandItem>
-              <CommandItem
-                onSelect={ () => {
-                  setSelectedCommand("set_pdr");
-                  setActiveScreen("params");
-                } }
-              >
-                <Smile/>
-                Set PDR
-              </CommandItem>
-              <CommandItem
-                onSelect={ () => {
-                  setSelectedCommand("crash_drone");
-                  setActiveScreen("params");
-                } }
-              >
-                <PlayCircle/>
-                Crash Drone
-              </CommandItem>
-            </CommandGroup>
-            <CommandGroup heading="Config">
-              <CommandItem
-                onSelect={ () => {
-                  setSelectedCommand("load_config");
-                  setActiveScreen("params");
-                } }
-              >
-                <HardDrive/>
-                Load Config
-              </CommandItem>
-              <CommandItem
-                onSelect={ () => {
-                  setSelectedCommand("get_config");
-                  executeCommand("get_config");
-                } }
-              >
-                <FileText/>
-                Get Config
-              </CommandItem>
-            </CommandGroup>
+            { commandGroups.map((group) => (
+              <CommandGroup key={ group.heading } heading={ group.heading }>
+                { group.commands.map(({ key, label, icon }) => (
+                  <CommandItem
+                    key={ key }
+                    onSelect={ () => {
+                      setSelectedCommand(key as keyof typeof commandSchemas);
+                      setActiveScreen(
+                        commandSchemas[key as keyof typeof commandSchemas] ? "params" : "main"
+                      );
+                      if (!commandSchemas[key as keyof typeof commandSchemas]) executeCommand({});
+                    } }
+                  >
+                    { icon }
+                    { label }
+                  </CommandItem>
+                )) }
+              </CommandGroup>
+            )) }
           </CommandList>
         </>
       ) : (
-        <div className="flex flex-col h-full">
+        <>
           <CommandHeader
-            title={ (selectedCommand ?? "")
-              .split("_")
-              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(" ") }
+            title={ selectedCommand?.replace("_", " ").toUpperCase() ?? "" }
             onBack={ () => setActiveScreen("main") }
             onClose={ () => setOpen(false) }
           />
-          <div className="flex-1 overflow-y-auto p-6">
-            <div className="space-y-4">{ renderParamsForm() }</div>
-          </div>
-          <div className="flex justify-end p-4 border-t">
-            <Button
-              onClick={() => executeCommand()}
-              disabled={loading}
-              className="min-w-[100px]"
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                "Execute"
-              )}
-            </Button>
-          </div>
-        </div>
+          <div className="p-6">{ renderParamsForm() }</div>
+        </>
       ) }
     </CommandDialog>
   );

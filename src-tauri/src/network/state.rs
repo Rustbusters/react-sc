@@ -310,6 +310,8 @@ impl NetworkState {
                 .send(DroneCommand::Crash)
                 .map_err(|_| "Failed to send Crash command")?;
         }
+        
+        debug!("Crashing drone {}", drone_id);
 
         // Remove from runtime structures
         self.simulation_controller_channels.remove(&drone_id);

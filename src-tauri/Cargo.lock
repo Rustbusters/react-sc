@@ -2284,7 +2284,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -3626,7 +3626,7 @@ dependencies = [
 [[package]]
 name = "rustbusters-drone"
 version = "1.0.0"
-source = "git+ssh://github.com/Rustbusters/drone.git?branch=dev/safe-sounds#85d7979f16f1f78dfc6cda54c5fa367251d2806c"
+source = "git+ssh://github.com/Rustbusters/drone.git?branch=dev/safe-sounds#2af8a196dd1c8deba9a5bced4128225c5fd2c7f5"
 dependencies = [
  "crossbeam-channel",
  "lazy_static",

@@ -1,14 +1,12 @@
-'use client';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import cytoscape from 'cytoscape';
-import { invoke } from '@tauri-apps/api/core';
+import { useCallback, useEffect, useRef, useState } from "react";
+import cytoscape from "cytoscape";
+import { invoke } from "@tauri-apps/api/core";
 import { RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const GraphComponent = React.memo(() => {
+const GraphComponent = () => {
   const cyRef = useRef<HTMLDivElement>(null);
   const [cy, setCy] = useState<cytoscape.Core | null>(null);
-
 
   const loadGraphData = useCallback(async () => {
     try {
@@ -16,30 +14,33 @@ const GraphComponent = React.memo(() => {
         drones: { id: string; connected_node_ids: string[] }[];
         clients: { id: string; connected_drone_ids: string[] }[];
         servers: { id: string; connected_drone_ids: string[] }[];
-      }>('get_config');
+      }>("get_config");
 
       if (!cy) return;
 
       cy.elements().remove();
 
-      const elements: (cytoscape.ElementDefinition | cytoscape.EdgeDefinition)[] = [];
+      const elements: (
+        | cytoscape.ElementDefinition
+        | cytoscape.EdgeDefinition
+      )[] = [];
 
       // Aggiunta dei nodi
       response.drones.forEach((drone) => {
         elements.push({
-          data: { id: drone.id, label: `${ drone.id }`, type: 'drone' }
+          data: { id: drone.id, label: `${drone.id}`, type: "drone" },
         });
       });
 
       response.clients.forEach((client) => {
         elements.push({
-          data: { id: client.id, label: `${ client.id }`, type: 'client' }
+          data: { id: client.id, label: `${client.id}`, type: "client" },
         });
       });
 
       response.servers.forEach((server) => {
         elements.push({
-          data: { id: server.id, label: `${ server.id }`, type: 'server' }
+          data: { id: server.id, label: `${server.id}`, type: "server" },
         });
       });
 
@@ -49,7 +50,7 @@ const GraphComponent = React.memo(() => {
           if (drone.id < nodeId) return; // Evita di aggiungere archi duplicati
 
           elements.push({
-            data: { source: drone.id, target: nodeId }
+            data: { source: drone.id, target: nodeId },
           });
         });
       });
@@ -59,7 +60,7 @@ const GraphComponent = React.memo(() => {
           if (server.id < droneId) return; // Evita di aggiungere archi duplicati
 
           elements.push({
-            data: { source: server.id, target: droneId }
+            data: { source: server.id, target: droneId },
           });
         });
       });
@@ -69,19 +70,19 @@ const GraphComponent = React.memo(() => {
           if (client.id < droneId) return; // Evita di aggiungere archi duplicati
 
           elements.push({
-            data: { source: client.id, target: droneId }
+            data: { source: client.id, target: droneId },
           });
         });
       });
 
       cy.add(elements);
-      cy.layout({ name: 'cose' }).run();
+      cy.layout({ name: "cose" }).run();
     } catch (error) {
-      console.error('Failed to load graph data:', error);
+      console.error("Failed to load graph data:", error);
 
-      if (error === 'No configuration loaded') {
+      if (error === "No configuration loaded") {
         alert(
-          'Configurazione non caricata. Carica una configurazione prima di visualizzare il grafo.'
+          "Configurazione non caricata. Carica una configurazione prima di visualizzare il grafo."
         );
       }
     }
@@ -96,78 +97,84 @@ const GraphComponent = React.memo(() => {
       elements: [],
       style: [
         {
-          selector: 'node',
+          selector: "node",
           style: {
-            'label': 'data(label)',
-            'text-halign': 'center',
-            'text-valign': 'center',
-            'background-color': (ele) => {
-              const colors: Record<'server' | 'drone' | 'client', string> = {
-                server: '#FEFAF4',
-                drone: '#F5FAFA',
-                client: '#F9FBF6'
+            label: "data(label)",
+            "text-halign": "center",
+            "text-valign": "center",
+            "background-color": (ele) => {
+              const colors: Record<"server" | "drone" | "client", string> = {
+                server: "#FEFAF4",
+                drone: "#F5FAFA",
+                client: "#F9FBF6",
               };
 
-              const type = ele.data('type') as 'server' | 'drone' | 'client';
-              return colors[type] || '#000';
+              const type = ele.data("type") as "server" | "drone" | "client";
+              return colors[type] || "#000";
             },
-            'border-width': 2,
-            'border-color': (ele) => {
-              const borderColors: Record<'server' | 'drone' | 'client', string> = {
-                server: '#EDCB95',
-                drone: '#9ACDC8',
-                client: '#C3D59D'
+            "border-width": 2,
+            "border-color": (ele) => {
+              const borderColors: Record<
+                "server" | "drone" | "client",
+                string
+              > = {
+                server: "#EDCB95",
+                drone: "#9ACDC8",
+                client: "#C3D59D",
               };
 
-              const type = ele.data('type') as 'server' | 'drone' | 'client';
-              return borderColors[type] || '#333';
+              const type = ele.data("type") as "server" | "drone" | "client";
+              return borderColors[type] || "#333";
             },
-            'width': 20,
-            'height': 20,
+            width: 20,
+            height: 20,
             "font-size": "12px",
-            'color': '#000',
-            'text-outline-color': '#000',
+            color: "#000",
+            "text-outline-color": "#000",
             // 'text-outline-width': '1px'
-          }
+          },
         },
         {
-          selector: 'edge',
+          selector: "edge",
           style: {
-            'width': 2,
-            'line-color': '#C2C2C2',
-            'curve-style': 'bezier'
-          }
+            width: 2,
+            "line-color": "#C2C2C2",
+            "curve-style": "bezier",
+          },
         },
         {
-          selector: 'node:selected',
+          selector: "node:selected",
           style: {
-            'border-width': 3,
-            'border-color': (ele) => {
-              const borderColors: Record<'server' | 'drone' | 'client', string> = {
-                server: '#E4B567',
-                drone: '#74BBB2',
-                client: '#A8C373'
+            "border-width": 3,
+            "border-color": (ele) => {
+              const borderColors: Record<
+                "server" | "drone" | "client",
+                string
+              > = {
+                server: "#E4B567",
+                drone: "#74BBB2",
+                client: "#A8C373",
               };
 
-              const type = ele.data('type') as 'server' | 'drone' | 'client';
-              return borderColors[type] || '#333';
+              const type = ele.data("type") as "server" | "drone" | "client";
+              return borderColors[type] || "#333";
             },
-          }
+          },
         },
         {
-          selector: 'edge:selected',
+          selector: "edge:selected",
           style: {
-            'line-color': '#ff6b6b',
-            'width': 3
-          }
-        }
+            "line-color": "#ff6b6b",
+            width: 3,
+          },
+        },
       ],
       layout: {
-        name: 'cose',
+        name: "cose",
         animate: true,
         fit: true,
-        padding: 80
-      }
+        padding: 80,
+      },
     });
 
     setCy(cyInstance);
@@ -180,30 +187,28 @@ const GraphComponent = React.memo(() => {
   // Carica i dati del grafo quando `cy` è pronto
   useEffect(() => {
     if (cy) {
-      loadGraphData().then(() => {
-      });
+      loadGraphData().then(() => {});
     }
   }, [cy, loadGraphData]);
 
   return (
     <div className="relative flex flex-col h-full w-full">
-      {/* Bottone posizionato in alto a destra */ }
+      {/* Bottone posizionato in alto a destra */}
       <Button
-        onClick={ loadGraphData }
+        onClick={loadGraphData}
         className="absolute top-4 right-4 z-10 p-2 aspect-square bg-blue-500 text-white rounded-md shadow-lg hover:bg-blue-600 focus:outline-none"
       >
-        <RefreshCcw className="w-5 h-5"/>
+        <RefreshCcw className="w-5 h-5" />
       </Button>
 
       <div
-        ref={ cyRef }
+        ref={cyRef}
         className="flex-grow w-full h-full rounded-lg shadow-md"
       />
     </div>
-
   );
-});
+};
 
-GraphComponent.displayName = 'GraphComponent';
+GraphComponent.displayName = "GraphComponent";
 
 export default GraphComponent;

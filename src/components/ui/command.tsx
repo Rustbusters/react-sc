@@ -1,5 +1,5 @@
 import * as React from "react";
-import { type DialogProps } from "@radix-ui/react-dialog";
+import { Description, type DialogProps } from "@radix-ui/react-dialog";
 import { Command as CommandPrimitive } from "cmdk";
 import { ChevronLeft, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -61,17 +61,26 @@ const VisuallyHidden = ({ children }: { children: React.ReactNode }) => (
 
 const CommandDialog = ({ children, ...props }: DialogProps) => (
   <Dialog { ...props }>
-    <DialogContent className="overflow-hidden p-0 w-[640px] max-h-[440px]">
-      <DialogTitle asChild>
-        <VisuallyHidden>Command Menu</VisuallyHidden>
-      </DialogTitle>
+    <DialogTitle>
+      Command Dialog
+    </DialogTitle>
+    <DialogContent
+      className="overflow-hidden p-0 w-[640px] max-h-[440px]"
+    >
+
+      {/* Command Menu */ }
       <Command
-        className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
+        className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5"
+      >
         { children }
       </Command>
+      <Description className="sr-only">
+        Use this command dialog to execute actions or navigate through commands.
+      </Description>
     </DialogContent>
   </Dialog>
 );
+
 
 const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,

@@ -1,17 +1,17 @@
 use crate::network::state::NetworkState;
 use crossbeam_channel::Receiver;
-use log::{error, info};
+use log::{debug, error, info};
+use node::commands::HostEvent;
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread;
-use node::commands::HostEvent;
 use wg_2024::controller::DroneEvent;
 use wg_2024::network::NodeId;
 use wg_2024::packet::{Packet, PacketType, FRAGMENT_DSIZE};
 
 pub struct Listener {
-    state: Arc<Mutex<NetworkState>>,
+    // state: Arc<Mutex<NetworkState>>,
     drone_channels: HashMap<NodeId, Receiver<DroneEvent>>,
     client_channels: HashMap<NodeId, Receiver<HostEvent>>,
     server_channels: HashMap<NodeId, Receiver<HostEvent>>,
@@ -39,7 +39,7 @@ impl Listener {
         drop(state_guard);
 
         Self {
-            state,
+            // state,
             drone_channels,
             client_channels,
             server_channels,
@@ -47,12 +47,13 @@ impl Listener {
     }
 
     pub fn start(self) {
+        info!("Starting listener thread");
         thread::spawn(move || loop {
             // Process drone events
             for (&node_id, drone_receiver) in &self.drone_channels {
                 if let Ok(event) = drone_receiver.try_recv() {
-                    println!(
-                        "DroneController received for drone {}: {:?}",
+                    debug!(
+                        "[LISTENER] DroneController received for drone {}: {:?}",
                         node_id, event
                     );
                     match event {
@@ -62,7 +63,10 @@ impl Listener {
                             }
                         }
                         DroneEvent::PacketDropped(packet) => {
-                            info!("[DRONE {}] PacketDropped: {:?}", node_id, packet);
+                            info!(
+                                "[LISTENER] - [DRONE {}] PacketDropped: {:?}",
+                                node_id, packet
+                            );
                         }
                         DroneEvent::ControllerShortcut(_) => {}
                     }
@@ -72,14 +76,14 @@ impl Listener {
             // Process client events
             for (&node_id, client_receiver) in &self.client_channels {
                 if let Ok(event) = client_receiver.try_recv() {
-                    info!("[CLIENT {}] : {:?}", node_id, event);
+                    info!("[LISTENER] - [CLIENT {}] : {:?}", node_id, event);
                 }
             }
 
             // Process server events
             for (&node_id, server_receiver) in &self.server_channels {
                 if let Ok(event) = server_receiver.try_recv() {
-                    info!("[SERVER {}] : {:?}", node_id, event);
+                    info!("[LISTENER] - [SERVER {}] : {:?}", node_id, event);
                 }
             }
 
