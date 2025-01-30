@@ -11,127 +11,100 @@ use wg_2024::network::NodeId;
 use wg_2024::packet::{Packet, PacketType, FRAGMENT_DSIZE};
 
 pub struct Listener {
-    // state: Arc<Mutex<NetworkState>>,
-    drone_channels: HashMap<NodeId, Receiver<DroneEvent>>,
-    client_channels: HashMap<NodeId, Receiver<HostEvent>>,
-    server_channels: HashMap<NodeId, Receiver<HostEvent>>,
+    state: Arc<Mutex<NetworkState>>,
 }
 
 impl Listener {
     pub fn new(state: Arc<Mutex<NetworkState>>) -> Self {
-        let state_guard = state.lock();
-        let drone_channels = state_guard
-            .simulation_controller_channels
-            .iter()
-            .map(|(&id, (_, receiver))| (id, receiver.clone()))
-            .collect();
-        let client_channels = state_guard
-            .client_controller_channels
-            .iter()
-            .map(|(&id, (_, receiver))| (id, receiver.clone()))
-            .collect();
-        let server_channels = state_guard
-            .server_controller_channels
-            .iter()
-            .map(|(&id, (_, receiver))| (id, receiver.clone()))
-            .collect();
-
-        drop(state_guard);
-
-        Self {
-            // state,
-            drone_channels,
-            client_channels,
-            server_channels,
-        }
+        Self { state }
     }
 
     pub fn start(self) {
         info!("Starting listener thread");
+
         thread::spawn(move || loop {
-            // Process drone events
-            for (&node_id, drone_receiver) in &self.drone_channels {
-                if let Ok(event) = drone_receiver.try_recv() {
-                    debug!(
-                        "[LISTENER] DroneController received for drone {}: {:?}",
-                        node_id, event
-                    );
-                    match event {
-                        DroneEvent::PacketSent(packet) => {
-                            if let Err(msg) = self.handle_drone_commands(packet) {
-                                error!("{:?}", msg);
+            let mut events_to_process = Vec::new();
+
+            {
+                // Lock state immutably and collect events
+                let state_guard = self.state.lock();
+
+                // Collect drone events
+                for (&node_id, (_, drone_receiver)) in state_guard.drones_controller_channels.iter() {
+                    if let Ok(event) = drone_receiver.try_recv() {
+                        events_to_process.push((node_id, event));
+                    }
+                }
+
+                // Collect client events
+                for (&node_id, (_, client_receiver)) in state_guard.client_controller_channels.iter() {
+                    if let Ok(event) = client_receiver.try_recv() {
+                        info!("[LISTENER] - [CLIENT {}] : {:?}", node_id, event);
+                    }
+                }
+
+                // Collect server events
+                for (&node_id, (_, server_receiver)) in state_guard.server_controller_channels.iter() {
+                    if let Ok(event) = server_receiver.try_recv() {
+                        info!("[LISTENER] - [SERVER {}] : {:?}", node_id, event);
+                    }
+                }
+            }
+            
+            let mut state_guard = self.state.lock();
+            for (node_id, event) in events_to_process {
+                info!(
+                    "[LISTENER] DroneController received for drone {}: {:?}",
+                    node_id, event
+                );
+
+                state_guard.received_messages.push(event.clone());
+
+                match event {
+                    DroneEvent::PacketSent(packet) => {
+                        debug!("[LISTENER] - [DRONE {}] PacketSent: {:?}", node_id, packet);
+                        state_guard.record_drone_sent_packet(node_id);
+                    }
+                    DroneEvent::PacketDropped(packet) => {
+                        debug!("[LISTENER] - [DRONE {}] PacketDropped: {:?}", node_id, packet);
+                        state_guard.record_drone_dropped_packet(node_id);
+                    }
+                    DroneEvent::ControllerShortcut(packet) => {
+                        match packet.pack_type {
+                            PacketType::Ack(_) | PacketType::Nack(_) | PacketType::FloodResponse(_) => {
+                                // Unlock before calling another function
+                                self.send_packet_to_destination(packet);
+                            }
+                            _ => {
+                                error!(
+                                    "[LISTENER] - [DRONE {}] Unexpected packet received: {:?}",
+                                    node_id, packet
+                                );
                             }
                         }
-                        DroneEvent::PacketDropped(packet) => {
-                            info!(
-                                "[LISTENER] - [DRONE {}] PacketDropped: {:?}",
-                                node_id, packet
-                            );
-                        }
-                        DroneEvent::ControllerShortcut(_) => {}
                     }
                 }
             }
 
-            // Process client events
-            for (&node_id, client_receiver) in &self.client_channels {
-                if let Ok(event) = client_receiver.try_recv() {
-                    info!("[LISTENER] - [CLIENT {}] : {:?}", node_id, event);
-                }
-            }
-
-            // Process server events
-            for (&node_id, server_receiver) in &self.server_channels {
-                if let Ok(event) = server_receiver.try_recv() {
-                    info!("[LISTENER] - [SERVER {}] : {:?}", node_id, event);
-                }
-            }
-
-            thread::sleep(std::time::Duration::from_millis(10));
+            // drop(state_guard); // Explicit drop before sleeping (optional)
+            // thread::sleep(std::time::Duration::from_millis(10)); // TODO: Make this configurable
         });
     }
 
-    fn handle_drone_commands(&self, packet: Packet) -> Result<(), String> {
-        match &packet.pack_type {
-            PacketType::MsgFragment(fragment) => {
-                if fragment.fragment_index == 0
-                    && fragment.total_n_fragments == 0
-                    && fragment.length == 0
-                {
-                    /*let hunt_mode = Self::get_hunt_mode(&fragment.data);
-                    self.handle_hunt_mode(hunt_mode)?;*/
+
+    fn send_packet_to_destination(&self, packet: Packet) {
+        if let Some(dest_id) = packet.routing_header.destination() {
+            if let Some((sender, _)) = self.state.lock().inter_node_channels.get(&dest_id) {
+                if sender.send(packet).is_err() {
+                    error!("[LISTENER] Failed to send packet to destination {}", dest_id);
+                } else {
+                    debug!("[LISTENER] Packet sent to destination {}", dest_id);
                 }
-                Ok(())
+            } else {
+                error!("[LISTENER] Destination {} not found in inter_node_channels", dest_id);
             }
-            _ => Ok(()),
+        } else {
+            error!("[LISTENER] No destination found in packet routing header");
         }
     }
-
-    /*fn get_hunt_mode(data: &[u8; FRAGMENT_DSIZE]) -> HuntMode {
-        let first_char = data[0] as char;
-        match first_char {
-            'n' => HuntMode::NormalShot(data[1]),
-            'l' => HuntMode::LongShot(data[1]),
-            'e' => HuntMode::EMPBlast,
-            _ => HuntMode::EMPBlast,
-        }
-    }*/
-
-    /*fn handle_hunt_mode(&self, hunt_mode: HuntMode) -> Result<(), String> {
-        match hunt_mode {
-            HuntMode::NormalShot(target_drone_id) => {
-                info!("NormalShot targeting drone {}", target_drone_id);
-                // Access or modify `self.state` as needed
-            }
-            HuntMode::LongShot(shot_range) => {
-                info!("LongShot with range {}", shot_range);
-                // Access or modify `self.state` as needed
-            }
-            HuntMode::EMPBlast => {
-                info!("EMPBlast triggered");
-                // Access or modify `self.state` as needed
-            }
-        }
-        Ok(())
-    }*/
 }

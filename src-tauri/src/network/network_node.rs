@@ -75,7 +75,7 @@ macro_rules! drone_factories {
 pub fn initialize_drones(state: &mut NetworkState) -> Result<(), NetworkError> {
     // Example: build an array with just one drone factory for demonstration
     // Ensure `RustyDrone` is actually `Send`.
-    let factories = drone_factories![RustBustersDrone, RustyDrone, LockheedRustin];
+    let factories = drone_factories![RustBustersDrone]; // RustyDrone, LockheedRustin
 
     let config = state
         .initial_config
@@ -91,7 +91,7 @@ pub fn initialize_drones(state: &mut NetworkState) -> Result<(), NetworkError> {
         // Store (Sender<DroneCommand>, Receiver<DroneEvent>) so the controller can
         // send commands and receive events from this drone
         state
-            .simulation_controller_channels
+            .drones_controller_channels
             .insert(drone.id, (cmd_tx.clone(), evt_rx));
 
         // Ensure we have inter_node_channels for this drone

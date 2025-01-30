@@ -4,14 +4,14 @@ import { invoke } from "@tauri-apps/api/core";
 
 export const DebugTab = () => {
 
-  const [config, setConfig] = React.useState<any>(null);
+  const [data, setData] = React.useState<any>(null);
 
   return (
     <div className="h-full w-full flex-col items-center">
       <div className="flex items-center gap-4">
         <Button onClick={ () => {
           invoke('get_config', {})
-            .then((retrivedConfig: any) => setConfig(retrivedConfig))
+            .then((retrivedConfig: any) => setData(retrivedConfig))
             .catch(err => console.error('Error getting config:', err));
         } } variant="default">Show</Button>
 
@@ -35,9 +35,19 @@ export const DebugTab = () => {
         >
           Init
         </Button>
+        <Button
+          onClick={ () => {
+            invoke('get_network_stats', {})
+              .then((stats: any) => setData(stats))
+              .catch(err => console.error('Error getting stats:', err));
+          } }
+          variant="link"
+        >
+          Get Stats
+        </Button>
       </div>
       <pre className="text-gray-400">
-            { JSON.stringify(config, null, 2) }
+            { JSON.stringify(data, null, 2) }
         </pre>
     </div>
   )

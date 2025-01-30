@@ -1,5 +1,3 @@
-"use client";
-
 import * as React from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
@@ -16,17 +14,27 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { invoke } from "@tauri-apps/api/core";
-import { FileText, HardDrive, Loader2, PlayCircle, Smile, StopCircle, User, Wifi } from "lucide-react";
+import {
+  FileText,
+  HardDrive,
+  Loader2,
+  MessageSquareText,
+  PlayCircle,
+  Smile,
+  StopCircle,
+  User,
+  Wifi
+} from "lucide-react";
 
 const commandSchemas = {
   start_network: null,
   stop_network: null,
   add_edge: z.object({
-    droneId: z.string().min(1, "Drone ID is required"),
+    drone_id: z.string().min(1, "Drone ID is required"),
     target_id: z.string().min(1, "Target ID is required"),
   }),
   remove_edge: z.object({
-    droneId: z.string().min(1, "Drone ID is required"),
+    drone_id: z.string().min(1, "Drone ID is required"),
     target_id: z.string().min(1, "Target ID is required"),
   }),
   set_pdr: z.object({
@@ -37,7 +45,37 @@ const commandSchemas = {
       .refine((value) => Number(value) >= 0 && Number(value) <= 100, "PDR must be between 0 and 100"),
   }),
   crash_drone: z.object({
-    droneId: z.string().min(1, "Drone ID is required"),
+    drone_id: z.string().min(1, "Drone ID is required"),
+  }),
+  send_packet: z.object({
+    sender_id: z
+      .string()
+      .default("1")
+      .refine((val) => !isNaN(Number(val)), "Sender ID must be a number"),
+    session_id: z
+      .string()
+      .default("1")
+      .refine((val) => !isNaN(Number(val)), "Session ID must be a number"),
+    hops: z
+      .string()
+      .default("2,3")
+      .refine(
+        (val) => val.split(",").every((hop) => !isNaN(Number(hop.trim()))),
+        "Hops must be a comma-separated list of numbers"
+      ),
+    hop_index: z
+      .string()
+      .default("0")
+      .refine((val) => !isNaN(Number(val)), "Hop Index must be a number"),
+    fragment_index: z
+      .string()
+      .default("0")
+      .refine((val) => !isNaN(Number(val)), "Fragment Index must be a number"),
+    total_fragments: z
+      .string()
+      .default("1")
+      .refine((val) => !isNaN(Number(val)), "Total Fragments must be a number"),
+    data: z.string().default("Hello world!"),
   }),
   load_config: z.object({
     path: z.string().min(1, "Path is required"),
@@ -45,20 +83,36 @@ const commandSchemas = {
   get_config: null,
 };
 
-const getDefaultValues = (command: keyof typeof commandSchemas | null) => {
-  if (!command || !commandSchemas[command]) return {};
+function getDefaultValues(command: keyof typeof commandSchemas | null) {
+  if (!command) return {};
 
   const schema = commandSchemas[command];
   if (!schema) return {};
 
-  // Inizializza i valori di default in base al tipo di campo
+  // Se non è null, è uno schema Zod
+  // Il ".shape" contiene i campi
+  const shape = (schema as z.ZodObject<any>)?.shape || {};
   const defaultValues: Record<string, string> = {};
-  Object.keys(schema.shape || {}).forEach((field) => {
-    defaultValues[field] = "";
-  });
+
+  // Per ogni campo dello schema
+  for (const field of Object.keys(shape)) {
+    const fieldSchema = shape[field];
+    // safeParse(undefined) -> se lo schema ha default, Zod lo userà
+    const parsed = fieldSchema.safeParse(undefined);
+    if (parsed.success) {
+      // Se è stringa o numero, lo convertiamo in stringa
+      defaultValues[field] =
+        typeof parsed.data === "string"
+          ? parsed.data
+          : String(parsed.data ?? "");
+    } else {
+      // Se non è success -> non c'è default -> stringa vuota
+      defaultValues[field] = "";
+    }
+  }
 
   return defaultValues;
-};
+}
 
 const commandGroups = [
   {
@@ -75,6 +129,7 @@ const commandGroups = [
       { key: "remove_edge", label: "Remove Edge", icon: <User className="mr-2"/> },
       { key: "set_pdr", label: "Set PDR", icon: <Smile className="mr-2"/> },
       { key: "crash_drone", label: "Crash Drone", icon: <PlayCircle className="mr-2"/> },
+      { key: "send_packet", label: "Send Packet", icon: <MessageSquareText className="mr-2"/> },
     ],
   },
   {
@@ -128,7 +183,7 @@ export function Raycast() {
         case "add_edge":
         case "remove_edge":
           await invoke(selectedCommand!, {
-            droneId: parseInt(data.droneId, 10),
+            droneId: parseInt(data.drone_id, 10),
             target_id: parseInt(data.target_id, 10),
           });
           break;
@@ -140,9 +195,21 @@ export function Raycast() {
           break;
         case "crash_drone":
           await invoke("send_crash_command", {
-            droneId: parseInt(data.droneId, 10),
+            droneId: parseInt(data.drone_id, 10),
           });
           break;
+        case "send_packet": {
+          await invoke("send_packet", {
+            senderId: parseInt(data.sender_id, 10),
+            sessionId: parseInt(data.session_id, 10),
+            hops: data.hops.split(",").map((hop: string) => parseInt(hop.trim(), 10)),
+            hopIndex: parseInt(data.hop_index, 10),
+            fragmentIndex: parseInt(data.fragment_index, 10),
+            totalFragments: parseInt(data.total_fragments, 10),
+            data: data.data,
+          });
+          break;
+        }
         case "load_config":
           await invoke("load_config", { path: data.path });
           break;
@@ -167,11 +234,13 @@ export function Raycast() {
 
   const renderParamsForm = () => {
     if (!selectedCommand || !commandSchemas[selectedCommand]) return null;
+    // Otteniamo i campi dallo schema
+    const shape = (commandSchemas[selectedCommand] as z.ZodObject<any>)?.shape || {};
 
     return (
       <Form { ...form }>
         <form onSubmit={ form.handleSubmit(executeCommand) } className="space-y-4">
-          { Object.keys(commandSchemas[selectedCommand].shape || {}).map((field) => (
+          { Object.keys(shape).map((field) => (
             <FormField
               key={ field }
               control={ form.control }
@@ -184,7 +253,7 @@ export function Raycast() {
                   <FormControl>
                     <Input
                       { ...formField }
-                      type={ field === "pdr" ? "text" : "number" }
+                      type={ field === "pdr" || field === "data" || field === "hops" ? "text" : "number" }
                       placeholder={ field === "pdr" ? "Enter PDR (0-100%)" : `Enter ${ field }` }
                     />
                   </FormControl>
@@ -241,7 +310,10 @@ export function Raycast() {
             onBack={ () => setActiveScreen("main") }
             onClose={ () => setOpen(false) }
           />
-          <div className="p-6">{ renderParamsForm() }</div>
+          {/* NB: Mettere la CommandList sistema del tutto il problema delle dimensioni variabili, tuttavia potrebbe stare male */ }
+          <CommandList>
+            <div className="p-6 overflow-y-auto">{ renderParamsForm() }</div>
+          </CommandList>
         </>
       ) }
     </CommandDialog>

@@ -61,7 +61,7 @@ const VisuallyHidden = ({ children }: { children: React.ReactNode }) => (
 
 const CommandDialog = ({ children, ...props }: DialogProps) => (
   <Dialog { ...props }>
-    <DialogTitle>
+    <DialogTitle className="hidden">
       Command Dialog
     </DialogTitle>
     <DialogContent

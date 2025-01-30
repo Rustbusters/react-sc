@@ -61,8 +61,7 @@ pub struct NetworkState {
     pub inter_node_channels: HashMap<NodeId, (Sender<Packet>, Receiver<Packet>)>,
 
     /// Channels to communicate with drones from the simulation controller.
-    pub simulation_controller_channels:
-        HashMap<NodeId, (Sender<DroneCommand>, Receiver<DroneEvent>)>,
+    pub drones_controller_channels: HashMap<NodeId, (Sender<DroneCommand>, Receiver<DroneEvent>)>,
 
     /// Channels to communicate with clients from the simulation controller.
     pub client_controller_channels: HashMap<NodeId, (Sender<HostCommand>, Receiver<HostEvent>)>,
@@ -72,6 +71,9 @@ pub struct NetworkState {
 
     /// Granular stats for each drone: NodeId -> DroneStats
     pub drone_stats: HashMap<NodeId, DroneStats>,
+
+    /// A list of received messages for each drone.
+    pub received_messages: Vec<DroneEvent>,
 }
 
 impl NetworkState {
@@ -82,10 +84,11 @@ impl NetworkState {
             graph: GraphState::default(),
             node_threads: HashMap::new(),
             inter_node_channels: HashMap::new(),
-            simulation_controller_channels: HashMap::new(),
+            drones_controller_channels: HashMap::new(),
             client_controller_channels: HashMap::new(),
             server_controller_channels: HashMap::new(),
             drone_stats: HashMap::new(),
+            received_messages: Vec::new(),
         }
     }
 
@@ -160,7 +163,7 @@ impl NetworkState {
         // Clear existing runtime state
         self.node_threads.clear();
         self.inter_node_channels.clear();
-        self.simulation_controller_channels.clear();
+        self.drones_controller_channels.clear();
         self.client_controller_channels.clear();
         self.server_controller_channels.clear();
         self.drone_stats.clear();
@@ -189,7 +192,7 @@ impl NetworkState {
         // Clear leftover structures
         self.node_threads.clear();
         self.inter_node_channels.clear();
-        self.simulation_controller_channels.clear();
+        self.drones_controller_channels.clear();
         self.client_controller_channels.clear();
         self.server_controller_channels.clear();
         self.drone_stats.clear();
@@ -305,16 +308,16 @@ impl NetworkState {
     /// original state from which we started.
     pub fn send_crash_command(&mut self, drone_id: NodeId) -> Result<(), String> {
         // Send command to the drone if it exists
-        if let Some((cmd_sender, _)) = self.simulation_controller_channels.get(&drone_id) {
+        if let Some((cmd_sender, _)) = self.drones_controller_channels.get(&drone_id) {
             cmd_sender
                 .send(DroneCommand::Crash)
                 .map_err(|_| "Failed to send Crash command")?;
         }
-        
+
         debug!("Crashing drone {}", drone_id);
 
         // Remove from runtime structures
-        self.simulation_controller_channels.remove(&drone_id);
+        self.drones_controller_channels.remove(&drone_id);
         self.inter_node_channels.remove(&drone_id);
         self.node_threads.remove(&drone_id);
 
@@ -343,7 +346,7 @@ impl NetworkState {
         }
 
         // Notify the drone to change PDR, if present
-        if let Some((cmd_sender, _)) = self.simulation_controller_channels.get(&drone_id) {
+        if let Some((cmd_sender, _)) = self.drones_controller_channels.get(&drone_id) {
             cmd_sender
                 .send(DroneCommand::SetPacketDropRate((pdr as f32) / 100.0))
                 .map_err(|_| "Failed to send SetPacketDropRate command")?;
@@ -378,7 +381,7 @@ impl NetworkState {
             .clone();
 
         let controller_sender = self
-            .simulation_controller_channels
+            .drones_controller_channels
             .get(&drone_id)
             .ok_or("Drone not found in simulation_controller_channels")?
             .0
@@ -417,7 +420,7 @@ impl NetworkState {
         }
 
         let controller_sender = self
-            .simulation_controller_channels
+            .drones_controller_channels
             .get(&drone_id)
             .ok_or("Drone not found in simulation_controller_channels")?
             .0
@@ -455,5 +458,15 @@ impl NetworkState {
         if let Some(stats) = self.drone_stats.get_mut(&drone_id) {
             stats.packets_dropped += 1;
         }
+    }
+
+    /// Returns the stats for a specific drone, if available.
+    pub fn get_drone_stats(&self, drone_id: NodeId) -> Option<&DroneStats> {
+        self.drone_stats.get(&drone_id)
+    }
+
+    /// Returns a reference to the entire drone_stats map.
+    pub fn get_all_drone_stats(&self) -> &HashMap<NodeId, DroneStats> {
+        &self.drone_stats
     }
 }
