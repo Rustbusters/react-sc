@@ -4,7 +4,11 @@ import { invoke } from "@tauri-apps/api/core";
 import { RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const GraphComponent = () => {
+interface GraphComponentProps {
+  onNodeSelect: (nodeId: string | null) => void;
+}
+
+const GraphComponent = ({ onNodeSelect }: GraphComponentProps) => {
   const cyRef = useRef<HTMLDivElement>(null);
   const [cy, setCy] = useState<cytoscape.Core | null>(null);
 
@@ -23,24 +27,24 @@ const GraphComponent = () => {
       const elements: (
         | cytoscape.ElementDefinition
         | cytoscape.EdgeDefinition
-      )[] = [];
+        )[] = [];
 
       // Aggiunta dei nodi
       response.drones.forEach((drone) => {
         elements.push({
-          data: { id: drone.id, label: `${drone.id}`, type: "drone" },
+          data: { id: drone.id, label: `${ drone.id }`, type: "drone" },
         });
       });
 
       response.clients.forEach((client) => {
         elements.push({
-          data: { id: client.id, label: `${client.id}`, type: "client" },
+          data: { id: client.id, label: `${ client.id }`, type: "client" },
         });
       });
 
       response.servers.forEach((server) => {
         elements.push({
-          data: { id: server.id, label: `${server.id}`, type: "server" },
+          data: { id: server.id, label: `${ server.id }`, type: "server" },
         });
       });
 
@@ -145,7 +149,7 @@ const GraphComponent = () => {
         {
           selector: "node:selected",
           style: {
-            "border-width": 3,
+            "border-width": 2.5,
             "border-color": (ele) => {
               const borderColors: Record<
                 "server" | "drone" | "client",
@@ -184,25 +188,49 @@ const GraphComponent = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (!cy) return;
+
+    const handleSelect = (event: cytoscape.EventObject) => {
+      const nodeId = event.target.id();
+      console.log("Nodo selezionato:", nodeId);
+      onNodeSelect(nodeId); // Passa l'ID selezionato a `App.tsx`
+    };
+
+    const handleUnselect = () => {
+      console.log("Nessun nodo selezionato");
+      onNodeSelect(null); // Quando nessun nodo è selezionato, invia `null`
+    };
+
+    cy.on("select", "node", handleSelect);
+    cy.on("unselect", "node", handleUnselect);
+
+    return () => {
+      cy.off("select", "node", handleSelect);
+      cy.off("unselect", "node", handleUnselect);
+    };
+  }, [cy, onNodeSelect]);
+
   // Carica i dati del grafo quando `cy` è pronto
   useEffect(() => {
     if (cy) {
-      loadGraphData().then(() => {});
+      loadGraphData().then(() => {
+      });
     }
   }, [cy, loadGraphData]);
 
   return (
     <div className="relative flex flex-col h-full w-full">
-      {/* Bottone posizionato in alto a destra */}
+      {/* Bottone posizionato in alto a destra */ }
       <Button
-        onClick={loadGraphData}
+        onClick={ loadGraphData }
         className="absolute top-4 right-4 z-10 p-2 aspect-square bg-blue-500 text-white rounded-md shadow-lg hover:bg-blue-600 focus:outline-none"
       >
-        <RefreshCcw className="w-5 h-5" />
+        <RefreshCcw className="w-5 h-5"/>
       </Button>
 
       <div
-        ref={cyRef}
+        ref={ cyRef }
         className="flex-grow w-full h-full rounded-lg shadow-md"
       />
     </div>

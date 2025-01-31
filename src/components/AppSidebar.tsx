@@ -8,13 +8,19 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { Calendar, Home, Inbox, Search, Send, Settings } from "lucide-react";
+import { Calendar, Home, Inbox, Play, Search, Send, Settings } from "lucide-react";
+import { NavLink } from "react-router-dom";
 
 const items = [
   {
     title: "Home",
-    url: "#",
+    url: "/",
     icon: Home,
+  },
+  {
+    title: "Simulazione",
+    url: "/simulation",
+    icon: Play,
   },
   {
     title: "Inbox",
@@ -38,7 +44,7 @@ const items = [
   },
   {
     title: "Settings",
-    url: "#",
+    url: "/settings",
     icon: Settings,
   },
 ]
@@ -54,10 +60,10 @@ export function AppSidebar() {
               { items.map((item) => (
                 <SidebarMenuItem key={ item.title }>
                   <SidebarMenuButton asChild>
-                    <a href={ item.url }>
+                    <NavLink to={ item.url } className={({ isActive }) => isActive ? "text-primary" : ""}>
                       <item.icon/>
                       <span>{ item.title }</span>
-                    </a>
+                    </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )) }

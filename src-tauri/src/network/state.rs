@@ -4,8 +4,11 @@ use crate::network::validation::validate_graph;
 use crossbeam_channel::{Receiver, Sender};
 use log::{debug, error, info, trace};
 use node::commands::{HostCommand, HostEvent};
-use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, VecDeque};
+use std::fmt::Display;
 use std::thread::JoinHandle;
+use std::time::{SystemTime, UNIX_EPOCH};
 use wg_2024::config::{Config, Drone, Server};
 use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::network::NodeId;
@@ -36,11 +39,59 @@ pub enum NodeType {
     Server,
 }
 
+const MAX_HISTORY: usize = 1000;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum DroneStatsType {
+    PacketsSent,
+    PacketsDropped,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DroneEventLog {
+    pub timestamp: u64,
+    pub event_type: DroneStatsType,
+}
+
 /// Granular statistics for each drone. You can extend this as needed.
 #[derive(Debug, Default)]
 pub struct DroneStats {
-    pub packets_sent: u64,
-    pub packets_dropped: u64,
+    pub events: VecDeque<DroneEventLog>,
+}
+
+impl DroneStats {
+    /// Record a sent packet event.
+    pub fn record_sent_packet(&mut self) {
+        self.record_event(DroneStatsType::PacketsSent);
+    }
+
+    /// Record a dropped packet event.
+    pub fn record_dropped_packet(&mut self) {
+        self.record_event(DroneStatsType::PacketsDropped);
+    }
+
+    /// Returns a copy of the events for this drone.
+    pub fn get_events(&self) -> Vec<DroneEventLog> {
+        self.events.iter().cloned().collect()
+    }
+
+    /// Internal helper to record an event with a timestamp.
+    fn record_event(&mut self, event_type: DroneStatsType) {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or_default();
+
+        self.events.push_back(DroneEventLog {
+            timestamp,
+            event_type,
+        });
+
+        if self.events.len() > MAX_HISTORY {
+            self.events.pop_front();
+        }
+    }
 }
 
 /// Main structure holding the network state and runtime data.
@@ -449,14 +500,14 @@ impl NetworkState {
     /// Increment the packets_sent counter for a given drone.
     pub fn record_drone_sent_packet(&mut self, drone_id: NodeId) {
         if let Some(stats) = self.drone_stats.get_mut(&drone_id) {
-            stats.packets_sent += 1;
+            stats.record_sent_packet();
         }
     }
 
     /// Increment the packets_dropped counter for a given drone.
     pub fn record_drone_dropped_packet(&mut self, drone_id: NodeId) {
         if let Some(stats) = self.drone_stats.get_mut(&drone_id) {
-            stats.packets_dropped += 1;
+            stats.record_dropped_packet();
         }
     }
 

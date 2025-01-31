@@ -6,20 +6,25 @@ mod simulation;
 
 use crate::commands::simulation::send_remove_sender_command;
 use crate::commands::{
+    get_all_drones_history,
+    get_all_drones_statistics,
+
     // config
     get_config,
+    // stats
+    get_drone_history,
+    get_drone_statistics,
+    get_global_statistics,
+    get_received_messages,
     load_config,
     // simulation
     send_add_sender_command,
     send_crash_command,
-    send_set_pdr_command,
     send_packet,
+    send_set_pdr_command,
     // network
     start_network,
     stop_network,
-    // stats
-    get_network_stats,
-    get_received_messages,
 };
 use crate::listener::Listener;
 use crate::network::state::NetworkState;
@@ -73,7 +78,11 @@ pub fn run() {
             send_remove_sender_command,
             send_packet,
             // stats
-            get_network_stats,
+            get_drone_history,
+            get_drone_statistics,
+            get_all_drones_history,
+            get_all_drones_statistics,
+            get_global_statistics,
             get_received_messages,
         ])
         .run(tauri::generate_context!())

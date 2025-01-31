@@ -178,11 +178,11 @@ export function Raycast() {
         case "start_network":
         case "stop_network":
         case "get_config":
-          await invoke(selectedCommand!);
+          await invoke(selectedCommand);
           break;
         case "add_edge":
         case "remove_edge":
-          await invoke(selectedCommand!, {
+          await invoke(selectedCommand, {
             droneId: parseInt(data.drone_id, 10),
             target_id: parseInt(data.target_id, 10),
           });
