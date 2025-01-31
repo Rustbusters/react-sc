@@ -29,7 +29,7 @@ const items = [
   },
   {
     title: "Send",
-    url: "#",
+    url: "/send",
     icon: Send,
   },
   {
@@ -60,7 +60,7 @@ export function AppSidebar() {
               { items.map((item) => (
                 <SidebarMenuItem key={ item.title }>
                   <SidebarMenuButton asChild>
-                    <NavLink to={ item.url } className={({ isActive }) => isActive ? "text-primary" : ""}>
+                    <NavLink to={ item.url } className={ ({ isActive }) => isActive ? "text-primary" : "" }>
                       <item.icon/>
                       <span>{ item.title }</span>
                     </NavLink>

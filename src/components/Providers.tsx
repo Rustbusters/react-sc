@@ -8,17 +8,17 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <>
       <SidebarProvider>
-        <AppSidebar />
+        <AppSidebar/>
         <main className="w-screen h-screen flex flex-col">
           <div className="w-full py-2 flex flex-row justify-between items-center">
-            <SidebarTrigger />
-            <SimulationStatusIndicator />
+            <SidebarTrigger/>
+            <SimulationStatusIndicator/>
           </div>
-          {children}
+          { children }
         </main>
       </SidebarProvider>
-      <Raycast />
-      <Toaster />
+      <Raycast/>
+      <Toaster/>
     </>
   );
 }

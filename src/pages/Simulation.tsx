@@ -8,10 +8,10 @@ const Simulation = () => {
   return (
     <div className="flex flex-col w-full h-full">
       <div className="flex flex-1">
-        <div className="flex-1 border border-amber-800 w-full h-full">
+        <div className="flex-1 w-full h-full">
           <GraphComponent onNodeSelect={ setSelectedNode }/>
         </div>
-        <div className="w-3/5 border border-amber-800">
+        <div className="w-3/5 ">
           <Stats selectedNode={ selectedNode }/>
         </div>
       </div>

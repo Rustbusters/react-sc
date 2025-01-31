@@ -224,14 +224,14 @@ const GraphComponent = ({ onNodeSelect }: GraphComponentProps) => {
       {/* Bottone posizionato in alto a destra */ }
       <Button
         onClick={ loadGraphData }
-        className="absolute top-4 right-4 z-10 p-2 aspect-square bg-blue-500 text-white rounded-md shadow-lg hover:bg-blue-600 focus:outline-none"
+        className="absolute top-4 right-4 z-10 p-2 aspect-square bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none"
       >
         <RefreshCcw className="w-5 h-5"/>
       </Button>
 
       <div
         ref={ cyRef }
-        className="flex-grow w-full h-full rounded-lg shadow-md"
+        className="flex-grow w-full h-full rounded-lg"
       />
     </div>
   );
