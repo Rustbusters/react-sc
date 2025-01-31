@@ -1,6 +1,6 @@
 use crate::network::state::GraphState;
-use std::collections::HashSet;
 use log::debug;
+use std::collections::HashSet;
 /*
 Checks that should be performed on the network graph:
 - The graph is connected
@@ -102,7 +102,12 @@ fn validate_clients_and_servers(graph: &GraphState) -> Result<(), String> {
                 debug!("Validating client {}", node);
                 let neighbors = graph.adjacency.get(node).ok_or("Client has no neighbors")?;
                 if neighbors.is_empty() || neighbors.len() > 2 {
-                    debug!("Client {} has {} neighbors: {:?}", node, neighbors.len(), neighbors);
+                    debug!(
+                        "Client {} has {} neighbors: {:?}",
+                        node,
+                        neighbors.len(),
+                        neighbors
+                    );
                     return Err(format!("Client {} must have 1-2 drone connections", node));
                 }
             }

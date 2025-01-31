@@ -37,3 +37,4 @@ lockheedrustin-drone = { git = "https://github.com/Lockheed-Rustin/drone.git" }
 
 thiserror = "2.0.3"
 parking_lot = "0.12"
+tauri-plugin-dialog = "2"

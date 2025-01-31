@@ -40,7 +40,7 @@ pub enum NetworkError {
 
     #[error("Channel not found for node {0}")]
     ChannelNotFound(NodeId),
-    
+
     #[error("Network in invalid state: {0}")]
     ValidationError(String),
 }

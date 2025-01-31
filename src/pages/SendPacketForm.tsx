@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@/components/ui/select";
+import { useState } from "react";
+import { Switch } from "@/components/ui/switch.tsx";
 
 // 📌 Schema di validazione con Zod
 const packetSchema = z.object({
@@ -20,9 +22,13 @@ const packetSchema = z.object({
   fragmentIndex: z.coerce.number().optional(),
   totalFragments: z.coerce.number().optional(),
   data: z.string().optional(),
+  batchCount: z.coerce.number().optional(),
+  interval: z.coerce.number().optional(),
+  randomMode: z.boolean().optional(),
 });
 
 export default function SendPacketForm() {
+  const [isRandomMode, setIsRandomMode] = useState(false);
   const form = useForm({
     resolver: zodResolver(packetSchema),
     defaultValues: {
@@ -33,6 +39,9 @@ export default function SendPacketForm() {
       fragmentIndex: undefined,
       totalFragments: undefined,
       data: "",
+      batchCount: 1,
+      interval: 1000,
+      randomMode: false,
     },
   });
 
@@ -41,17 +50,54 @@ export default function SendPacketForm() {
     try {
       const hopsArray = data.hops.split(",").map((id: string) => Number(id.trim()));
 
-      await invoke("send_packet", {
-        sender_id: Number(data.senderId),
-        session_id: Number(data.sessionId),
-        hops: hopsArray,
-        hop_index: 0,
-        fragment_index: data.fragmentIndex ?? 0,
-        total_fragments: data.totalFragments ?? 1,
-        data: data.data ?? "",
-      });
+      if (data.randomMode) {
+        // 🎲 Modalità Random
+        for (let i = 0; i < data.randomPacketCount; i++) {
+          setTimeout(async () => {
+            await invoke("send_packet", {
+              sender_id: Math.floor(Math.random() * 10) + 1, // ID random tra 1 e 10
+              session_id: Math.floor(Math.random() * 10000),
+              hops: Array.from({ length: Math.floor(Math.random() * 5) + 1 }, () =>
+                Math.floor(Math.random() * 10) + 1
+              ),
+              hop_index: 0,
+              fragment_index: Math.floor(Math.random() * 10),
+              total_fragments: Math.floor(Math.random() * 10) + 1,
+              data: "Random Data",
+            });
+          }, i * data.randomInterval);
+        }
+        toast.success(`Inviati ${ data.randomPacketCount } pacchetti randomici`);
+      } else if (data.batchCount > 1) {
+        // 📦 Invio Multiplo
+        for (let i = 0; i < data.batchCount; i++) {
+          setTimeout(async () => {
+            await invoke("send_packet", {
+              sender_id: Number(data.senderId),
+              session_id: Number(data.sessionId),
+              hops: hopsArray,
+              hop_index: 0,
+              fragment_index: i,
+              total_fragments: data.batchCount,
+              data: data.data ?? "",
+            });
+          }, i * data.interval);
+        }
+        toast.success(`Inviati ${ data.batchCount } pacchetti con intervallo di ${ data.interval }ms`);
+      } else {
+        // 📤 Invio Singolo
+        await invoke("send_packet", {
+          sender_id: Number(data.senderId),
+          session_id: Number(data.sessionId),
+          hops: hopsArray,
+          hop_index: 0,
+          fragment_index: data.fragmentIndex ?? 0,
+          total_fragments: data.totalFragments ?? 1,
+          data: data.data ?? "",
+        });
 
-      toast.success("Pacchetto inviato con successo!");
+        toast.success("Pacchetto inviato con successo!");
+      }
       form.reset(); // Reset form dopo invio
     } catch (error) {
       toast.error(`Errore nell'invio: ${ error }`);
@@ -145,6 +191,43 @@ export default function SendPacketForm() {
               </FormItem>
             ) }/>
           ) }
+
+          {/* Campi batchCount & interval */ }
+          <div className="grid grid-cols-2 gap-4">
+            <FormField control={ form.control } name="batchCount" render={ ({ field }) => (
+              <FormItem>
+                <FormLabel>Numero di Pacchetti</FormLabel>
+                <FormControl><Input type="number" { ...field } /></FormControl>
+                <FormMessage/>
+              </FormItem>
+            ) }/>
+
+            <FormField control={ form.control } name="interval" render={ ({ field }) => (
+              <FormItem>
+                <FormLabel>Intervallo (ms)</FormLabel>
+                <FormControl><Input type="number" { ...field } /></FormControl>
+                <FormMessage/>
+              </FormItem>
+            ) }/>
+          </div>
+
+          {/* Switch per modalità randomica */ }
+          <FormField control={ form.control } name="randomMode" render={ ({ field }) => (
+            <FormItem>
+              <div className="flex flex-row items-center gap-4">
+                <FormLabel className="cursor-pointer">Modalità Random</FormLabel>
+                <FormControl>
+                  <Switch checked={ isRandomMode } onCheckedChange={ (checked) => {
+                    setIsRandomMode(checked);
+                    field.onChange(checked);
+                  } }
+                          className="mt-0"
+                  />
+                </FormControl>
+              </div>
+            </FormItem>
+          ) }/>
+
 
           {/* Pulsante di Invio */ }
           <div className="flex justify-center">

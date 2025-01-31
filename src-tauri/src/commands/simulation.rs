@@ -117,8 +117,7 @@ pub fn send_packet(
 
     info!(
         "Packet successfully sent to node {}: {:?}",
-        dest_node,
-        packet
+        dest_node, packet
     );
     Ok(())
 }
