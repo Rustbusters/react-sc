@@ -1,10 +1,8 @@
 use crate::error::NetworkError;
 use crate::network::state::NetworkState;
 use crossbeam_channel::{unbounded, Sender};
-use lockheedrustin_drone::LockheedRustin;
 use node::SimpleHost;
 use rustbusters_drone::RustBustersDrone;
-use rusty_drones::RustyDrone;
 use serde::de::Error;
 use std::collections::HashMap;
 use std::thread;

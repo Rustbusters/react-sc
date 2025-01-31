@@ -24,7 +24,7 @@ Command.displayName = CommandPrimitive.displayName;
 const CommandHeader = ({
                          title,
                          onBack,
-                         onClose,
+                         // onClose,
                        }: {
   title: string;
   onBack: () => void;
