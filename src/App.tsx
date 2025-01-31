@@ -1,10 +1,9 @@
 import "./App.css";
 import GraphComponent from "@/components/GraphComponent.tsx";
-import { Console } from "@/components/Console.tsx";
 
 function App() {
   return (
-    <main className="flex flex-col w-screen h-screen">
+    <div className="flex flex-col w-full h-full">
       <div className="flex flex-1">
         <div className="flex-1">
           {/* Grafo */ }
@@ -18,9 +17,9 @@ function App() {
         </div>
       </div>
       <div className="h-1/3 border border-amber-800">
-        <Console/>
+        {/*<Console/>*/ }
       </div>
-    </main>
+    </div>
   );
 }
 
