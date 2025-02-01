@@ -1,4 +1,10 @@
-import { Button } from "@/components/ui/button.tsx";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -11,30 +17,46 @@ const statusStyles = {
 export const SimulationStatusIndicator = () => {
   const [status, setStatus] = useState<keyof typeof statusStyles>("Init");
 
-  const handleClick = async () => {
-    let newStatus: keyof typeof statusStyles;
-
+  const handleAction = async (action: "start" | "stop" | "restart") => {
     try {
-      if (status === "Init") {
+      if (action === "start") {
         await invoke("start_network");
-        newStatus = "Running";
-      } else if (status === "Running") {
+        setStatus("Running");
+      } else if (action === "stop") {
         await invoke("stop_network");
-        newStatus = "Stopped";
-      } else {
+        setStatus("Stopped");
+      } else if (action === "restart") {
+        // Per il restart, fermiamo la rete e poi la riavviamo
+        await invoke("stop_network");
         await invoke("start_network");
-        newStatus = "Running";
+        setStatus("Running");
       }
-      setStatus(newStatus);
     } catch (error) {
       console.error("Errore nell'aggiornamento dello stato:", error);
     }
   };
 
   return (
-    <Button variant="ghost" className="mx-2" onClick={ handleClick }>
-      <span className={ `${ statusStyles[status].color } rounded-full w-2 h-2 inline-block` }/>
-      { statusStyles[status].text }
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="mx-2">
+          <span
+            className={`${statusStyles[status].color} rounded-full w-2 h-2 inline-block mr-2`}
+          />
+          {statusStyles[status].text}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuItem onSelect={() => handleAction("start")}>
+          Start
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => handleAction("stop")}>
+          Stop
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => handleAction("restart")}>
+          Restart
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };

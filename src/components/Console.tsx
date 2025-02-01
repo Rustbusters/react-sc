@@ -1,46 +1,48 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
+interface Message {
+  type: string;
+  packet: string;
+}
+
 export const Console = () => {
-  const [messages, setMessages] = useState<{ type: string; packet: string }[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
+  // Funzione per ottenere i messaggi dal backend
   const fetchAndDisplayMessages = async () => {
     try {
-      const response = await invoke<{ messages: { type: string; packet: string }[] }>("get_received_messages");
-      const newMessages = response.messages.filter(
-        (message) => !messages.some((msg) => msg.packet === message.packet)
-      );
-
-      if (newMessages.length > 0) {
-        setMessages((prevMessages) => [...prevMessages, ...newMessages]);
-      }
+      const response = await invoke<{ messages: Message[] }>("get_received_messages");
+      // Se il backend restituisce la lista completa dei messaggi,
+      // possiamo aggiornare lo stato direttamente.
+      setMessages(response.messages);
     } catch (error) {
       console.error("Failed to fetch messages:", error);
     }
   };
 
+  // Effettua il primo fetch e imposta il polling ogni 5 secondi
   useEffect(() => {
-    const interval = setInterval(fetchAndDisplayMessages, 5000); // Fetch messages every 5 seconds
+    fetchAndDisplayMessages(); // fetch iniziale
+    const interval = setInterval(fetchAndDisplayMessages, 5000);
     return () => clearInterval(interval);
-  }, [messages]);
+  }, []);
 
-  // Scroll automatico all'ultimo messaggio
+  // Scorrimento automatico all'ultimo messaggio
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Funzione per colorare i tipi di messaggio
+  // Funzione per assegnare il colore in base al tipo di messaggio
   const getMessageColor = (type: string) => {
     switch (type) {
-      case "INFO":
-        return "text-blue-400";
-      case "WARN":
-        return "text-yellow-400";
-      case "ERROR":
-        return "text-red-400";
-      case "SUCCESS":
+      case "PacketSent":
         return "text-green-400";
+      case "PacketDropped":
+        return "text-red-400";
+      case "ControllerShortcut":
+        return "text-blue-400";
       default:
         return "text-gray-300";
     }

@@ -1,5 +1,5 @@
 use crate::error::NetworkError;
-use crate::network::state::NetworkState;
+use crate::network::state::{GraphState, NetworkState};
 use log::{error, info};
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -29,12 +29,26 @@ pub fn start_network(state: TauriState<Arc<Mutex<NetworkState>>>) -> Result<(), 
 pub fn stop_network(state: TauriState<Arc<Mutex<NetworkState>>>) -> Result<(), String> {
     let mut net_state = state.lock();
 
-    // Drain the node_threads, joining each thread
+    // Se la rete è già ferma, segnala e ritorna subito
+    if net_state.node_threads.is_empty() {
+        info!("Network is already stopped");
+        return Ok(());
+    }
+
+    // Drain dei node_threads e join di ciascun thread
     for (node_id, handle) in net_state.node_threads.drain() {
         if let Err(e) = handle.join() {
             error!("Failed to join thread for node {}: {:?}", node_id, e);
         }
     }
+
+    // Resetta gli altri stati runtime per permettere un riavvio pulito
+    net_state.inter_node_channels.clear();
+    net_state.drones_controller_channels.clear();
+    net_state.client_controller_channels.clear();
+    net_state.server_controller_channels.clear();
+    net_state.drone_stats.clear();
+    net_state.graph = GraphState::default();
 
     info!("Network stopped successfully");
     Ok(())

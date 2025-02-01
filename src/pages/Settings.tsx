@@ -35,7 +35,7 @@ const Settings = () => {
         filters: [{ name: "Config Files", extensions: ["toml"] }],
       });
 
-      if (selectedPath && typeof selectedPath === "string") {
+      if (selectedPath) {
         saveConfigPath(selectedPath);
         setConfigPath(selectedPath);
         toast.success("File di configurazione selezionato!");

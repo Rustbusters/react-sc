@@ -6,7 +6,6 @@ use log::{debug, error, info, trace};
 use node::commands::{HostCommand, HostEvent};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use std::fmt::Display;
 use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
 use wg_2024::config::{Config, Drone, Server};
