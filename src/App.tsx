@@ -5,11 +5,13 @@ import Settings from "@/pages/Settings.tsx";
 import NotFound from "@/pages/NotFound.tsx";
 import Simulation from "@/pages/Simulation.tsx";
 import SendPacketForm from "@/pages/SendPacketForm.tsx";
+import Logs from "@/pages/Logs.tsx";
 
 function App() {
   return (
     <Routes>
       <Route path="/" element={ <Home/> }/>
+      <Route path="/inbox" element={ <Logs/> }/>
       <Route path="/send" element={ <SendPacketForm/> }/>
       <Route path="/simulation" element={ <Simulation/> }/>
       <Route path="/settings" element={ <Settings/> }/>

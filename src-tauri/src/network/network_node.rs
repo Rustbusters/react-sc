@@ -2,11 +2,13 @@ use crate::error::NetworkError;
 use crate::network::state::NetworkState;
 use client::RustbustersClient;
 use crossbeam_channel::{unbounded, Sender};
+use log::info;
 use rustbusters_drone::RustBustersDrone;
 use serde::de::Error;
-use server::RustBustersServer;
+use server::{RustBustersServer, RustBustersServerController};
 use std::collections::HashMap;
-use std::thread;
+use std::net::Ipv4Addr;
+use std::{env, thread};
 use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::drone::Drone;
 use wg_2024::network::NodeId;
@@ -242,6 +244,11 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
         .as_ref()
         .ok_or(NetworkError::NoConfigLoaded)?;
 
+    let (http_server_address, http_public_path, ws_server_address) = config_server_controller();
+    let server_controller =
+        RustBustersServerController::new(http_server_address, http_public_path, ws_server_address);
+    server_controller.launch();
+
     for server in &config.server {
         let (cmd_tx, cmd_rx) = unbounded::<common_utils::HostCommand>();
         let (evt_tx, evt_rx) = unbounded::<common_utils::HostEvent>();
@@ -293,11 +300,42 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
                 packet_recv,
                 None,
             );
-            server_host.run();
+            server_host.launch();
         });
 
         state.node_threads.insert(server.id, handle);
     }
 
     Ok(())
+}
+
+fn config_server_controller() -> (String, String, String) {
+    info!("Reading server configuration from .env file");
+    let server_ip: [u8; 4] = env::var("SERVER_IP")
+        .expect("SERVER_IP must be set in .env file")
+        .parse::<Ipv4Addr>()
+        .expect("SERVER_IP must be a valid IpV4 IP address")
+        .octets();
+    info!("Server IP: {:?}", server_ip);
+    let port = env::var("SERVER_PORT")
+        .expect("SERVER_PORT must be set in .env file")
+        .parse::<u16>()
+        .expect("Error in parsing HTTP_SERVER_PORT from .env");
+    info!("Server port: {:?}", port);
+    let http_public_path =
+        env::var("SERVER_PUBLIC_PATH").expect("SERVER_PUBLIC_PATH must be set in .env file");
+    info!("Server public path: {:?}", http_public_path);
+
+    let ip_str: String = server_ip
+        .iter()
+        .map(|n| n.to_string())
+        .collect::<Vec<String>>()
+        .join(".");
+    let http_server_address = format!("{}:{}", ip_str, port);
+    let ws_server_address = format!("{}:{}", ip_str, port + 1);
+
+    info!("HTTP server address: {}", http_server_address);
+    info!("WS server address: {}", ws_server_address);
+
+    (http_server_address, http_public_path, ws_server_address)
 }

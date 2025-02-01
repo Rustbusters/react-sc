@@ -1,9 +1,9 @@
 use crate::error::NetworkError;
 use crate::network::network_node::{initialize_clients, initialize_drones, initialize_servers};
 use crate::network::validation::validate_graph;
+use common_utils::{HostCommand, HostEvent};
 use crossbeam_channel::{Receiver, Sender};
 use log::{debug, error, info, trace};
-use node::commands::{HostCommand, HostEvent};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::thread::JoinHandle;

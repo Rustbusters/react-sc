@@ -1,7 +1,6 @@
 use crate::network::state::NetworkState;
 use crossbeam_channel::Receiver;
 use log::{debug, error, info};
-use node::commands::HostEvent;
 use parking_lot::Mutex;
 use std::sync::Arc;
 use std::thread;
@@ -40,7 +39,7 @@ impl Listener {
                     state_guard.client_controller_channels.iter()
                 {
                     if let Ok(event) = client_receiver.try_recv() {
-                        info!("[LISTENER] - [CLIENT {}] : {:?}", node_id, event);
+                        // info!("[LISTENER] - [CLIENT {}] : {:?}", node_id, event);
                     }
                 }
 
@@ -49,30 +48,27 @@ impl Listener {
                     state_guard.server_controller_channels.iter()
                 {
                     if let Ok(event) = server_receiver.try_recv() {
-                        info!("[LISTENER] - [SERVER {}] : {:?}", node_id, event);
+                        // info!("[LISTENER] - [SERVER {}] : {:?}", node_id, event);
                     }
                 }
             }
 
             let mut state_guard = self.state.lock();
             for (node_id, event) in events_to_process {
-                info!(
-                    "[LISTENER] DroneController received for drone {}: {:?}",
-                    node_id, event
-                );
+                // info!("[LISTENER] DroneController received for drone {}: {:?}",node_id, event);
 
                 state_guard.received_messages.push(event.clone());
 
                 match event {
                     DroneEvent::PacketSent(packet) => {
-                        debug!("[LISTENER] - [DRONE {}] PacketSent: {:?}", node_id, packet);
-                        state_guard.record_drone_sent_packet(node_id);
+                        /*debug!("[LISTENER] - [DRONE {}] PacketSent: {:?}", node_id, packet);
+                        state_guard.record_drone_sent_packet(node_id);*/
                     }
                     DroneEvent::PacketDropped(packet) => {
-                        debug!(
+                        /*debug!(
                             "[LISTENER] - [DRONE {}] PacketDropped: {:?}",
                             node_id, packet
-                        );
+                        );*/
                         state_guard.record_drone_dropped_packet(node_id);
                     }
                     DroneEvent::ControllerShortcut(packet) => {
@@ -84,10 +80,10 @@ impl Listener {
                                 self.send_packet_to_destination(packet);
                             }
                             _ => {
-                                error!(
+                                /*error!(
                                     "[LISTENER] - [DRONE {}] Unexpected packet received: {:?}",
                                     node_id, packet
-                                );
+                                );*/
                             }
                         }
                     }

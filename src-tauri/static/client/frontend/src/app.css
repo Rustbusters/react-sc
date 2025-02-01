@@ -1,0 +1,27 @@
+/* tailwind */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Scrollbar moderna */
+.chat-box::-webkit-scrollbar {
+    width: 8px;
+}
+
+.chat-box::-webkit-scrollbar-thumb {
+    background-color: #3b82f6; /* Azzurro (Tailwind 'blue-500') */
+    border-radius: 6px;
+}
+
+.chat-box::-webkit-scrollbar-track {
+    background-color: #f0f4ff; /* Colore simile allo sfondo */
+}
+
+/*tailwind darkmode for scrollbar*/
+.dark .chat-box::-webkit-scrollbar-thumb {
+    background-color: #2563eb; /* Azzurro scuro (Tailwind 'blue-700') */
+}
+
+.dark .chat-box::-webkit-scrollbar-track {
+    background-color: #1f2937; /* Blu scuro (Tailwind 'blue-800') */
+}

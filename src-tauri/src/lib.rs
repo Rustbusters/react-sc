@@ -29,10 +29,13 @@ use crate::commands::{
 use crate::listener::Listener;
 use crate::network::state::NetworkState;
 
+use dotenv::dotenv;
 use parking_lot::Mutex;
 use std::sync::Arc;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    dotenv().ok();
     let state = Arc::new(Mutex::new(NetworkState::new()));
 
     tauri::Builder::default()
@@ -44,7 +47,8 @@ pub fn run() {
                 if cfg!(debug_assertions) {
                     app.handle().plugin(
                         tauri_plugin_log::Builder::default()
-                            .level(log::LevelFilter::Debug)
+                            .level(log::LevelFilter::Info)
+                            .filter(|metadata| metadata.target().starts_with("reactsc"))
                             .build(),
                     )?;
                 }
