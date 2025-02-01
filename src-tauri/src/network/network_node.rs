@@ -1,9 +1,10 @@
 use crate::error::NetworkError;
 use crate::network::state::NetworkState;
+use client::RustbustersClient;
 use crossbeam_channel::{unbounded, Sender};
-use node::SimpleHost;
 use rustbusters_drone::RustBustersDrone;
 use serde::de::Error;
+use server::RustBustersServer;
 use std::collections::HashMap;
 use std::thread;
 use wg_2024::controller::{DroneCommand, DroneEvent};
@@ -170,9 +171,9 @@ pub fn initialize_clients(state: &mut NetworkState) -> Result<(), NetworkError> 
 
     for client in &config.client {
         // 1) Create a channel for commands (controller -> client)
-        let (cmd_tx, cmd_rx) = unbounded::<node::commands::HostCommand>();
+        let (cmd_tx, cmd_rx) = unbounded::<common_utils::HostCommand>();
         // 2) Create a channel for events (client -> controller)
-        let (evt_tx, evt_rx) = unbounded::<node::commands::HostEvent>();
+        let (evt_tx, evt_rx) = unbounded::<common_utils::HostEvent>();
 
         // Store in state so we can send commands to the client, read events from it
         state
@@ -216,13 +217,13 @@ pub fn initialize_clients(state: &mut NetworkState) -> Result<(), NetworkError> 
 
         let client_clone = client.clone();
         let handle = thread::spawn(move || {
-            let mut client_host = SimpleHost::new(
+            let mut client_host = RustbustersClient::new(
                 client_clone.id,
-                wg_2024::packet::NodeType::Client,
                 evt_tx, // the client can send events
                 cmd_rx, // the client receives commands
                 packet_recv,
                 packet_send,
+                None,
             );
             client_host.run();
         });
@@ -242,8 +243,8 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
         .ok_or(NetworkError::NoConfigLoaded)?;
 
     for server in &config.server {
-        let (cmd_tx, cmd_rx) = unbounded::<node::commands::HostCommand>();
-        let (evt_tx, evt_rx) = unbounded::<node::commands::HostEvent>();
+        let (cmd_tx, cmd_rx) = unbounded::<common_utils::HostCommand>();
+        let (evt_tx, evt_rx) = unbounded::<common_utils::HostEvent>();
 
         state
             .server_controller_channels
@@ -284,13 +285,13 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
 
         let server_clone = server.clone();
         let handle = thread::spawn(move || {
-            let mut server_host = SimpleHost::new(
+            let mut server_host = RustBustersServer::new(
                 server_clone.id,
-                wg_2024::packet::NodeType::Server,
                 evt_tx,
                 cmd_rx,
-                packet_recv,
                 packet_send,
+                packet_recv,
+                None,
             );
             server_host.run();
         });
