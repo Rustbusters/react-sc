@@ -6,6 +6,7 @@ import NotFound from "@/pages/NotFound.tsx";
 import Simulation from "@/pages/Simulation.tsx";
 import SendPacketForm from "@/pages/SendPacketForm.tsx";
 import Logs from "@/pages/Logs.tsx";
+import NetworkStatsPage from "@/pages/NetworkStats.tsx";
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
       <Route path="/" element={ <Home/> }/>
       <Route path="/inbox" element={ <Logs/> }/>
       <Route path="/send" element={ <SendPacketForm/> }/>
+      <Route path="/stats" element={ <NetworkStatsPage/> }/>
       <Route path="/simulation" element={ <Simulation/> }/>
       <Route path="/settings" element={ <Settings/> }/>
       <Route path="*" element={ <NotFound/> }/>

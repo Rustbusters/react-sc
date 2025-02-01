@@ -55,14 +55,14 @@ export default function SendPacketForm() {
         for (let i = 0; i < data.randomPacketCount; i++) {
           setTimeout(async () => {
             await invoke("send_packet", {
-              sender_id: Math.floor(Math.random() * 10) + 1, // ID random tra 1 e 10
-              session_id: Math.floor(Math.random() * 10000),
+              senderId: Math.floor(Math.random() * 10) + 1, // ID random tra 1 e 10
+              sessionId: Math.floor(Math.random() * 10000),
               hops: Array.from({ length: Math.floor(Math.random() * 5) + 1 }, () =>
                 Math.floor(Math.random() * 10) + 1
               ),
-              hop_index: 0,
-              fragment_index: Math.floor(Math.random() * 10),
-              total_fragments: Math.floor(Math.random() * 10) + 1,
+              hopIndex: 0,
+              fragmentIndex: Math.floor(Math.random() * 10),
+              totalFragments: Math.floor(Math.random() * 10) + 1,
               data: "Random Data",
             });
           }, i * data.randomInterval);
@@ -73,12 +73,12 @@ export default function SendPacketForm() {
         for (let i = 0; i < data.batchCount; i++) {
           setTimeout(async () => {
             await invoke("send_packet", {
-              sender_id: Number(data.senderId),
-              session_id: Number(data.sessionId),
+              senderId: Number(data.senderId),
+              sessionId: Number(data.sessionId),
               hops: hopsArray,
-              hop_index: 0,
-              fragment_index: i,
-              total_fragments: data.batchCount,
+              hopIndex: 0,
+              fragmentIndex: i,
+              totalFragments: data.batchCount,
               data: data.data ?? "",
             });
           }, i * data.interval);
@@ -87,12 +87,12 @@ export default function SendPacketForm() {
       } else {
         // 📤 Invio Singolo
         await invoke("send_packet", {
-          sender_id: Number(data.senderId),
-          session_id: Number(data.sessionId),
+          senderId: Number(data.senderId),
+          sessionId: Number(data.sessionId),
           hops: hopsArray,
-          hop_index: 0,
-          fragment_index: data.fragmentIndex ?? 0,
-          total_fragments: data.totalFragments ?? 1,
+          hopIndex: 0,
+          fragmentIndex: data.fragmentIndex ?? 0,
+          totalFragments: data.totalFragments ?? 1,
           data: data.data ?? "",
         });
 

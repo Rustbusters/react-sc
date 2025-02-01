@@ -108,7 +108,7 @@ const Settings = () => {
       ) }
 
       {/* Pulsante per Caricare Config */ }
-      <Button onClick={ handleLoadConfig } className="w-full bg-blue-500 text-white mt-4">
+      <Button onClick={ handleLoadConfig } className="w-full mt-4">
         🚀 Carica Configurazione
       </Button>
     </div>
