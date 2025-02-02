@@ -211,6 +211,22 @@ const GraphComponent = ({ onNodeSelect }: GraphComponentProps) => {
     };
   }, [cy, onNodeSelect]);
 
+  useEffect(() => {
+    if (!cy) return;
+
+    const handleSelect = (event: cytoscape.EventObject) => {
+      const nodeId = event.target.id();
+      console.log("Nodo selezionato:", nodeId);
+      onNodeSelect(nodeId);
+    };
+
+    cy.on("tap", "node", handleSelect);
+
+    return () => {
+      cy.off("tap", "node", handleSelect);
+    };
+  }, [cy, onNodeSelect]);
+
   // Carica i dati del grafo quando `cy` è pronto
   useEffect(() => {
     if (cy) {

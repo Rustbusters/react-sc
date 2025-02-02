@@ -1,4 +1,4 @@
-use crate::network::state::{DroneStatsType, NetworkState};
+use crate::network::state::{DroneStatsType, NetworkState, NodeType};
 use parking_lot::Mutex;
 use serde_json::json;
 use serde_json::Value;
@@ -165,4 +165,49 @@ pub fn get_received_messages(state: State<Arc<Mutex<NetworkState>>>) -> Value {
         .collect();
 
     json!({ "messages": messages })
+}
+
+#[tauri::command]
+pub fn get_network_infos(state: State<Arc<Mutex<NetworkState>>>) -> Value {
+    let state = state.lock();
+
+    let mut nodes_info = Vec::new();
+
+    for (&node_id, metadata) in &state.graph.node_info {
+        let mut node_data = json!({
+            "node_id": node_id,
+            "type": match metadata.node_type {
+                NodeType::Drone => "Drone",
+                NodeType::Client => "Client",
+                NodeType::Server => "Server",
+            },
+            "connections": state.graph.adjacency.get(&node_id).cloned().unwrap_or_default()
+        });
+
+        // Aggiungi informazioni specifiche per i droni
+        if let NodeType::Drone = metadata.node_type {
+            let drone_stats = state.get_drone_stats(node_id);
+            let packets_sent = drone_stats.map_or(0, |s| {
+                s.events
+                    .iter()
+                    .filter(|e| e.event_type == DroneStatsType::PacketsSent)
+                    .count() as u64
+            });
+
+            let packets_dropped = drone_stats.map_or(0, |s| {
+                s.events
+                    .iter()
+                    .filter(|e| e.event_type == DroneStatsType::PacketsDropped)
+                    .count() as u64
+            });
+
+            node_data["pdr"] = json!(metadata.pdr);
+            node_data["packets_sent"] = json!(packets_sent);
+            node_data["packets_dropped"] = json!(packets_dropped);
+        }
+
+        nodes_info.push(node_data);
+    }
+
+    json!({ "nodes": nodes_info })
 }
