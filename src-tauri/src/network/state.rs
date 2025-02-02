@@ -123,7 +123,7 @@ pub struct NetworkState {
     pub drone_stats: HashMap<NodeId, DroneStats>,
 
     /// A list of received messages for each drone.
-    pub received_messages: Vec<DroneEvent>,
+    pub received_messages: Vec<(u32, DroneEvent)>,
 }
 
 impl NetworkState {

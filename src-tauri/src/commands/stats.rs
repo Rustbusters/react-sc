@@ -145,17 +145,20 @@ pub fn get_received_messages(state: State<Arc<Mutex<NetworkState>>>) -> Value {
     let messages: Vec<Value> = state
         .received_messages
         .iter()
-        .map(|event| match event {
+        .map(|(node_id, event)| match event {
             DroneEvent::PacketSent(packet) => json!({
                 "type": "PacketSent",
+                "node": node_id,
                 "packet": format!("{:?}", packet)
             }),
             DroneEvent::PacketDropped(packet) => json!({
                 "type": "PacketDropped",
+                "node": node_id,
                 "packet": format!("{:?}", packet)
             }),
             DroneEvent::ControllerShortcut(packet) => json!({
                 "type": "ControllerShortcut",
+                "node": node_id,
                 "packet": format!("{:?}", packet)
             }),
         })

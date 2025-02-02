@@ -60,7 +60,7 @@ impl Listener {
                     node_id, event
                 );
 
-                state_guard.received_messages.push(event.clone());
+                state_guard.received_messages.push((node_id as u32, event.clone()));
 
                 match event {
                     DroneEvent::PacketSent(packet) => {
