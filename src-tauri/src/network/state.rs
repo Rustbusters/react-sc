@@ -24,7 +24,7 @@ pub struct GraphState {
 }
 
 /// Metadata for a single node in the graph.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct NodeMetadata {
     pub node_type: NodeType,
     pub pdr: f32,
@@ -32,7 +32,7 @@ pub struct NodeMetadata {
 }
 
 /// Simple enum to distinguish node types.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum NodeType {
     Drone,
     Client,
@@ -409,85 +409,167 @@ impl NetworkState {
         Ok(())
     }
 
-    /// Dynamically adds a link between two drones (or drone-client, etc.) in the runtime graph.
-    /// Does NOT update the static config.
-    pub fn send_add_sender_command(
+    pub fn add_neighbor(
         &mut self,
-        drone_id: NodeId,
-        target_id: NodeId,
-    ) -> Result<(), String> {
-        if drone_id == target_id {
-            error!("Cannot connect a node to itself.");
-            return Err("Drone and target can't be the same node".to_string());
+        node_id: NodeId,
+        neighbor_id: NodeId,
+    ) -> Result<(), NetworkError> {
+        if node_id == neighbor_id {
+            return Err(NetworkError::InvalidOperation(
+                "Un nodo non può essere connesso da se stesso.".to_string(),
+            ));
         }
 
-        // Acquire the target's packet sender
-        let target_sender = self
-            .inter_node_channels
-            .get(&target_id)
-            .ok_or("Target node not found in inter_node_channels")?
-            .0
-            .clone();
+        let node_type = self
+            .get_node_type(node_id)
+            .ok_or_else(|| NetworkError::NodeNotFound(node_id.to_string()))?;
 
-        let controller_sender = self
-            .drones_controller_channels
-            .get(&drone_id)
-            .ok_or("Drone not found in simulation_controller_channels")?
-            .0
-            .clone();
+        let neighbor_type = self
+            .get_node_type(neighbor_id)
+            .ok_or_else(|| NetworkError::NodeNotFound(neighbor_id.to_string()))?;
 
-        // Notify the drone that it has a new neighbor
-        controller_sender
-            .send(DroneCommand::AddSender(target_id, target_sender))
-            .map_err(|_| "Failed to send AddSender command")?;
+        self.send_add_sender_command(node_id, &node_type, neighbor_id)?;
+        self.send_add_sender_command(neighbor_id, &neighbor_type, node_id)?;
 
-        // Update adjacency
         self.graph
             .adjacency
-            .entry(drone_id)
+            .entry(node_id)
             .or_default()
-            .push(target_id);
+            .push(neighbor_id);
         self.graph
             .adjacency
-            .entry(target_id)
+            .entry(neighbor_id)
             .or_default()
-            .push(drone_id);
+            .push(node_id);
 
+        info!("Aggiunto collegamento tra {} e {}", node_id, neighbor_id);
         Ok(())
     }
 
-    /// Dynamically removes a link between two nodes in the runtime graph.
-    /// Does NOT update the static config.
-    pub fn send_remove_sender_command(
+    pub fn send_add_sender_command(
         &mut self,
-        drone_id: NodeId,
+        node_id: NodeId,
+        node_type: &NodeType,
         target_id: NodeId,
-    ) -> Result<(), String> {
-        if drone_id == target_id {
-            error!("Cannot remove a link from a node to itself.");
-            return Err("Drone and target can't be the same node".to_string());
-        }
+    ) -> Result<(), NetworkError> {
 
-        let controller_sender = self
-            .drones_controller_channels
-            .get(&drone_id)
-            .ok_or("Drone not found in simulation_controller_channels")?
+        let target_sender = self
+            .inter_node_channels
+            .get(&target_id)
+            .ok_or(NetworkError::ChannelNotFound(target_id))?
             .0
             .clone();
-
-        // Instruct the drone to remove the sender
-        controller_sender
-            .send(DroneCommand::RemoveSender(target_id))
-            .map_err(|_| "Failed to send RemoveSender command")?;
-
-        // Update adjacency to remove the link
-        if let Some(adj) = self.graph.adjacency.get_mut(&drone_id) {
-            adj.retain(|&id| id != target_id);
+        
+        match node_type {
+            NodeType::Drone => {
+                if let Some(sender) = self.drones_controller_channels.get(&node_id) {
+                    sender
+                        .0
+                        .send(DroneCommand::AddSender(target_id, target_sender))
+                        .map_err(|_| NetworkError::CommandSendError(node_id.to_string()))?;
+                } else {
+                    return Err(NetworkError::ChannelNotFound(node_id));
+                }
+            }
+            NodeType::Client => {
+                if let Some(sender) = self.client_controller_channels.get(&node_id) {
+                    sender
+                        .0
+                        .send(HostCommand::AddSender(target_id, target_sender))
+                        .map_err(|_| NetworkError::CommandSendError(node_id.to_string()))?;
+                } else {
+                    return Err(NetworkError::ChannelNotFound(node_id));
+                }
+            }
+            NodeType::Server => {
+                if let Some(sender) = self.server_controller_channels.get(&node_id) {
+                    sender
+                        .0
+                        .send(HostCommand::AddSender(target_id, target_sender))
+                        .map_err(|_| NetworkError::CommandSendError(node_id.to_string()))?;
+                } else {
+                    return Err(NetworkError::ChannelNotFound(node_id));
+                }
+            }
         }
-        if let Some(adj) = self.graph.adjacency.get_mut(&target_id) {
-            adj.retain(|&id| id != drone_id);
+        Ok(())
+    }
+
+    pub fn remove_neighbor(
+        &mut self,
+        node_id: NodeId,
+        neighbor_id: NodeId,
+    ) -> Result<(), NetworkError> {
+        // Un nodo non può disconnettersi da se stesso.
+        if node_id == neighbor_id {
+            return Err(NetworkError::InvalidOperation(
+                "Un nodo non può essere disconnesso da se stesso.".to_string(),
+            ));
         }
 
+        // Verifica che entrambi i nodi esistano nella rete.
+        let node_type = self
+            .get_node_type(node_id)
+            .ok_or_else(|| NetworkError::NodeNotFound(node_id.to_string()))?;
+
+        let neighbor_type = self
+            .get_node_type(neighbor_id)
+            .ok_or_else(|| NetworkError::NodeNotFound(neighbor_id.to_string()))?;
+
+        // Usa il helper per inviare il comando di rimozione per entrambi i nodi.
+        self.send_remove_sender_command(node_id, &node_type, neighbor_id)?;
+        self.send_remove_sender_command(neighbor_id, &neighbor_type, node_id)?;
+
+        // Rimuove il collegamento nella lista di adiacenza.
+        if let Some(adj) = self.graph.adjacency.get_mut(&node_id) {
+            adj.retain(|&id| id != neighbor_id);
+        }
+        if let Some(adj) = self.graph.adjacency.get_mut(&neighbor_id) {
+            adj.retain(|&id| id != node_id);
+        }
+
+        info!("Rimosso collegamento tra {} e {}", node_id, neighbor_id);
+        Ok(())
+    }
+
+    pub fn send_remove_sender_command(
+        &mut self,
+        node_id: NodeId,
+        node_type: &NodeType,
+        target_id: NodeId,
+    ) -> Result<(), NetworkError> {
+        match node_type {
+            NodeType::Drone => {
+                if let Some(sender) = self.drones_controller_channels.get(&node_id) {
+                    sender
+                        .0
+                        .send(DroneCommand::RemoveSender(target_id))
+                        .map_err(|_| NetworkError::CommandSendError(node_id.to_string()))?;
+                } else {
+                    return Err(NetworkError::ChannelNotFound(node_id));
+                }
+            }
+            NodeType::Client => {
+                if let Some(sender) = self.client_controller_channels.get(&node_id) {
+                    sender
+                        .0
+                        .send(HostCommand::RemoveSender(target_id))
+                        .map_err(|_| NetworkError::CommandSendError(node_id.to_string()))?;
+                } else {
+                    return Err(NetworkError::ChannelNotFound(node_id));
+                }
+            }
+            NodeType::Server => {
+                if let Some(sender) = self.server_controller_channels.get(&node_id) {
+                    sender
+                        .0
+                        .send(HostCommand::RemoveSender(target_id))
+                        .map_err(|_| NetworkError::CommandSendError(node_id.to_string()))?;
+                } else {
+                    return Err(NetworkError::ChannelNotFound(node_id));
+                }
+            }
+        }
         Ok(())
     }
 
@@ -517,5 +599,12 @@ impl NetworkState {
     /// Returns a reference to the entire node_stats map.
     pub fn get_all_node_stats(&self) -> &HashMap<NodeId, NodeStats> {
         &self.node_stats
+    }
+
+    pub fn get_node_type(&self, node_id: NodeId) -> Option<NodeType> {
+        self.graph
+            .node_info
+            .get(&node_id)
+            .map(|meta| meta.node_type.clone())
     }
 }

@@ -1,6 +1,8 @@
-use crate::network::state::NetworkState;
+use crate::network::state::{NetworkState, NodeType};
 use log::{debug, error, info};
 use parking_lot::Mutex;
+use serde_json::json;
+use serde_json::Value;
 use std::sync::Arc;
 use tauri::State;
 use wg_2024::network::{NodeId, SourceRoutingHeader};
@@ -26,30 +28,6 @@ pub fn send_set_pdr_command(
     state.lock().send_set_pdr_command(drone_id as NodeId, pdr)
 }
 
-/// Dynamically adds a new link (sender) between two drone IDs in the runtime graph.
-#[tauri::command]
-pub fn send_add_sender_command(
-    state: State<Arc<Mutex<NetworkState>>>,
-    drone_id: u32,
-    target_id: u32,
-) -> Result<(), String> {
-    state
-        .lock()
-        .send_add_sender_command(drone_id as NodeId, target_id as NodeId)
-}
-
-/// Dynamically removes a link (sender) between two drone IDs in the runtime graph.
-#[tauri::command]
-pub fn send_remove_sender_command(
-    state: State<Arc<Mutex<NetworkState>>>,
-    drone_id: u32,
-    target_id: u32,
-) -> Result<(), String> {
-    state
-        .lock()
-        .send_remove_sender_command(drone_id as NodeId, target_id as NodeId)
-}
-
 #[tauri::command]
 pub fn add_neighbor(
     state: State<Arc<Mutex<NetworkState>>>,
@@ -57,22 +35,9 @@ pub fn add_neighbor(
     neighbor_id: NodeId,
 ) -> Result<(), String> {
     let mut state = state.lock();
-
-    if node_id == neighbor_id {
-        return Err("Un nodo non può essere connesso a se stesso.".to_string());
-    }
-    // Assicuriamoci che entrambi i nodi esistano nella rete
-    if !state.graph.node_info.contains_key(&node_id) {
-        return Err(format!("Nodo {} non trovato nella rete.", node_id));
-    }
-    if !state.graph.node_info.contains_key(&neighbor_id) {
-        return Err(format!("Nodo {} non trovato nella rete.", neighbor_id));
-    }
-
-    state.send_add_sender_command(node_id, neighbor_id)?;
-    state.send_add_sender_command(neighbor_id, node_id)?;
-
-    Ok(())
+    state
+        .add_neighbor(node_id, neighbor_id)
+        .map_err(|e| e.to_string())
 }
 // TODO: aggiornare il grafo
 #[tauri::command]
@@ -82,21 +47,9 @@ pub fn remove_neighbor(
     neighbor_id: NodeId,
 ) -> Result<(), String> {
     let mut state = state.lock();
-
-    if node_id == neighbor_id {
-        return Err("Un nodo non può essere scollegato da se stesso.".to_string());
-    }
-    if !state.graph.node_info.contains_key(&node_id) {
-        return Err(format!("Nodo {} non trovato nella rete.", node_id));
-    }
-    if !state.graph.node_info.contains_key(&neighbor_id) {
-        return Err(format!("Nodo {} non trovato nella rete.", neighbor_id));
-    }
-
-    state.send_remove_sender_command(node_id, neighbor_id)?;
-    state.send_remove_sender_command(neighbor_id, node_id)?;
-
-    Ok(())
+    state
+        .remove_neighbor(node_id, neighbor_id)
+        .map_err(|e| e.to_string())
 }
 
 /// Sends a packet from a specific sender to the network.
@@ -169,4 +122,75 @@ pub fn send_packet(
         dest_node, packet
     );
     Ok(())
+}
+
+#[tauri::command]
+pub fn get_graph(state: State<Arc<Mutex<NetworkState>>>) -> Value {
+    let state = state.lock();
+    
+    let drones: Vec<_> = state.graph.node_info.iter().filter_map(|(&id, meta)| {
+        if matches!(meta.node_type, NodeType::Drone) {
+            Some(json!({
+                "id": id,
+                "connected_node_ids": state.graph.adjacency.get(&id).cloned().unwrap_or_default(),
+                "pdr": meta.pdr,
+            }))
+        } else {
+            None
+        }
+    }).collect();
+
+    let clients: Vec<_> = state.graph.node_info.iter().filter_map(|(&id, meta)| {
+        if matches!(meta.node_type, NodeType::Client) {
+            Some(json!({
+                "id": id,
+                "connected_drone_ids": state.graph.adjacency.get(&id).cloned().unwrap_or_default(),
+            }))
+        } else {
+            None
+        }
+    }).collect();
+
+    let servers: Vec<_> = state.graph.node_info.iter().filter_map(|(&id, meta)| {
+        if matches!(meta.node_type, NodeType::Server) {
+            Some(json!({
+                "id": id,
+                "connected_drone_ids": state.graph.adjacency.get(&id).cloned().unwrap_or_default(),
+            }))
+        } else {
+            None
+        }
+    }).collect();
+    
+    if drones.is_empty() && clients.is_empty() && servers.is_empty() {
+        if let Some(config) = &state.initial_config {
+            return json!({
+                "drones": config.drone.iter().map(|d| {
+                    json!({
+                        "id": d.id,
+                        "connected_node_ids": d.connected_node_ids,
+                        "pdr": d.pdr,
+                    })
+                }).collect::<Vec<_>>(),
+                "clients": config.client.iter().map(|c| {
+                    json!({
+                        "id": c.id,
+                        "connected_drone_ids": c.connected_drone_ids,
+                    })
+                }).collect::<Vec<_>>(),
+                "servers": config.server.iter().map(|s| {
+                    json!({
+                        "id": s.id,
+                        "connected_drone_ids": s.connected_drone_ids,
+                    })
+                }).collect::<Vec<_>>(),
+            });
+        }
+    }
+
+    json!({
+        "drones": drones,
+        "clients": clients,
+        "servers": servers,
+    })
 }

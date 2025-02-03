@@ -18,7 +18,7 @@ const GraphComponent = ({ onNodeSelect }: GraphComponentProps) => {
         drones: { id: string; connected_node_ids: string[] }[];
         clients: { id: string; connected_drone_ids: string[] }[];
         servers: { id: string; connected_drone_ids: string[] }[];
-      }>("get_config");
+      }>("get_graph");
 
       if (!cy) return;
 

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { invoke } from "@tauri-apps/api/core";
-import { HexagonIcon, LaptopIcon, ServerIcon } from "lucide-react"; // Corretto LaptopIcon
+import { LaptopIcon, ServerIcon } from "lucide-react";
+import { PiDrone } from "react-icons/pi"; // Corretto LaptopIcon
 
 interface NodeInfo {
   node_id: number;
@@ -17,21 +18,23 @@ const NetworkInfos = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchNetworkInfos = async () => {
-      try {
-        const response = await invoke<{ nodes: NodeInfo[] }>("get_network_infos");
-        console.log(response);
-        setNetworkData(response.nodes);
-      } catch (err) {
-        setError("Errore nel recupero delle informazioni di rete.");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchNetworkInfos = async () => {
+    try {
+      const response = await invoke<{ nodes: NodeInfo[] }>("get_network_infos");
+      console.log(response);
+      setNetworkData(response.nodes);
+    } catch (err) {
+      setError("Errore nel recupero delle informazioni di rete.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchNetworkInfos();
+    const interval = setInterval(fetchNetworkInfos, 2000);
+    return () => clearInterval(interval);
   }, []);
 
   if (loading) return <p className="text-center">Caricamento...</p>;
@@ -57,7 +60,7 @@ const NetworkInfos = () => {
               <TableRow key={ node.node_id } className="hover:bg-gray-100">
                 <TableCell className="font-medium">{ node.node_id }</TableCell>
                 <TableCell className="flex items-center gap-2">
-                  { node.type === "Drone" && <HexagonIcon className="w-5 h-5  text-[#9ACDC8]" strokeWidth={ 2.5 }/> }
+                  { node.type === "Drone" && <PiDrone className="w-5 h-5  text-[#9ACDC8]" strokeWidth={ 2.5 }/> }
                   { node.type === "Server" && <ServerIcon className="w-5 h-5  text-[#EDCB95]" strokeWidth={ 2.5 }/> }
                   { node.type === "Client" && <LaptopIcon className="w-5 h-5  text-[#C3D59D]" strokeWidth={ 2.5 }/> }
                   {/*<span>{ node.type }</span>*/ }

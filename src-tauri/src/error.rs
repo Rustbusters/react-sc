@@ -23,8 +23,8 @@ pub enum NetworkError {
     #[error("Invalid configuration for path: {0}")]
     InvalidConfigPath(PathBuf),
 
-    #[error("The selected drone does not exist")]
-    DroneNotFound,
+    #[error("The selected node does not exist: {0}")]
+    NodeNotFound(String),
 
     #[error("The target drone does not exist")]
     TargetDroneNotFound,
@@ -43,6 +43,12 @@ pub enum NetworkError {
 
     #[error("Network in invalid state: {0}")]
     ValidationError(String),
+
+    #[error("Command send error: {0}")]
+    CommandSendError(String),
+
+    #[error("Invalid operation: {0}")]
+    InvalidOperation(String),
 }
 
 impl Serialize for NetworkError {

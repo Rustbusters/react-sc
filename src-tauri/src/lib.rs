@@ -5,12 +5,11 @@ mod network;
 mod simulation;
 mod utils;
 
-use crate::commands::simulation::send_remove_sender_command;
 use crate::commands::{
     add_neighbor, get_all_drones_history, get_all_drones_statistics, get_config, get_drone_history,
-    get_drone_statistics, get_global_statistics, get_network_infos, get_node_info,
-    get_received_messages, load_config, remove_neighbor, send_add_sender_command,
-    send_crash_command, send_packet, send_set_pdr_command, start_network, stop_network,
+    get_drone_statistics, get_global_statistics, get_graph, get_network_infos, get_node_info,
+    get_received_messages, load_config, remove_neighbor, send_crash_command, send_packet,
+    send_set_pdr_command, start_network, stop_network,
 };
 use crate::listener::Listener;
 use crate::network::state::NetworkState;
@@ -65,11 +64,10 @@ pub fn run() {
             // simulation commands
             send_crash_command,
             send_set_pdr_command,
-            send_add_sender_command,
-            send_remove_sender_command,
             send_packet,
             remove_neighbor,
             add_neighbor,
+            get_graph,
             // stats
             get_drone_history,
             get_drone_statistics,
