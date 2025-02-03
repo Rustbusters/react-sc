@@ -127,7 +127,7 @@ pub fn send_packet(
 #[tauri::command]
 pub fn get_graph(state: State<Arc<Mutex<NetworkState>>>) -> Value {
     let state = state.lock();
-    
+
     let drones: Vec<_> = state.graph.node_info.iter().filter_map(|(&id, meta)| {
         if matches!(meta.node_type, NodeType::Drone) {
             Some(json!({
@@ -161,7 +161,7 @@ pub fn get_graph(state: State<Arc<Mutex<NetworkState>>>) -> Value {
             None
         }
     }).collect();
-    
+
     if drones.is_empty() && clients.is_empty() && servers.is_empty() {
         if let Some(config) = &state.initial_config {
             return json!({
