@@ -247,3 +247,53 @@ pub fn get_network_infos(state: State<Arc<Mutex<NetworkState>>>) -> Value {
 
     json!({ "nodes": nodes_info })
 }
+
+#[tauri::command]
+pub fn get_node_info(state: State<Arc<Mutex<NetworkState>>>, node_id: NodeId) -> Value {
+    let state = state.lock();
+
+    if let Some(metadata) = state.graph.node_info.get(&node_id) {
+        let mut connections = state
+            .graph
+            .adjacency
+            .get(&node_id)
+            .cloned()
+            .unwrap_or_default();
+        connections.sort();
+        let mut node_data = json!({
+            "node_id": node_id,
+            "type": match metadata.node_type {
+                NodeType::Drone => "Drone",
+                NodeType::Client => "Client",
+                NodeType::Server => "Server",
+            },
+            "connections": connections,
+        });
+
+        if let NodeType::Drone = metadata.node_type {
+            node_data["pdr"] = json!(metadata.pdr);
+        }
+
+        let node_stats = state.get_node_stats(node_id);
+        if let Some(stats) = node_stats {
+            let total_sent = stats
+                .events
+                .iter()
+                .filter(|e| e.event_type == NodeStatsType::PacketsSent)
+                .count() as u64;
+
+            let total_dropped = stats
+                .events
+                .iter()
+                .filter(|e| e.event_type == NodeStatsType::PacketsDropped)
+                .count() as u64;
+
+            node_data["packets_sent"] = json!(total_sent);
+            node_data["packets_dropped"] = json!(total_dropped);
+        }
+
+        node_data
+    } else {
+        json!({ "error": "Node not found" })
+    }
+}

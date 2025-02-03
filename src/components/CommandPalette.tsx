@@ -188,8 +188,8 @@ export function Raycast() {
           });
           break;
         case "set_pdr":
-          await invoke("send_set_pdr_command", {
-            drone_id: parseInt(data.drone_id, 10),
+          await invoke("send_set_pdr_command", { // FIXME: controllare tutto il file
+            droneId: parseInt(data.drone_id, 10),
             pdr: Number(data.pdr), // Converte la stringa in numero
           });
           break;

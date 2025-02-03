@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import cytoscape from "cytoscape";
 import { invoke } from "@tauri-apps/api/core";
-import { RefreshCcw } from "lucide-react";
+import { MousePointerClick, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface GraphComponentProps {
@@ -249,6 +249,10 @@ const GraphComponent = ({ onNodeSelect }: GraphComponentProps) => {
         ref={ cyRef }
         className="flex-grow w-full h-full rounded-lg"
       />
+      <div className="w-full flex flex-row items-center justify-center gap-2 pb-2">
+        <MousePointerClick className="w-5 h-5"/>
+        <p className="text-center text-gray-700 font-semibold">Click on nodes</p>
+      </div>
     </div>
   );
 };

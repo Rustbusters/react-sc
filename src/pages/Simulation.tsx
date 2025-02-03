@@ -1,9 +1,11 @@
 import GraphComponent from "@/components/GraphComponent.tsx";
 import { useState } from "react";
 import NetworkInfos from "@/components/NetworkInfos.tsx";
+import { Sheet, SheetContent, SheetHeader } from "@/components/ui/sheet.tsx";
+import NodeDetails from "@/components/NodeDetails.tsx";
 
 const Simulation = () => {
-  const [_selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [selectedNode, setSelectedNode] = useState<string | null>(null);
 
   return (
     <div className="flex flex-col w-full h-full">
@@ -15,6 +17,16 @@ const Simulation = () => {
           <NetworkInfos/>
         </div>
       </div>
+
+      {/* Sheet di ShadCN */ }
+      <Sheet open={ !!selectedNode } onOpenChange={ (open) => !open && setSelectedNode(null) }>
+        <SheetContent>
+          <SheetHeader>
+            {/*<SheetTitle> Dettagli del Nodo </SheetTitle>*/ }
+          </SheetHeader>
+          { selectedNode && <NodeDetails nodeId={ selectedNode } onClose={ () => setSelectedNode(null) }/> }
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

@@ -1,14 +1,9 @@
-import BarChart from "@/components/graphs/BarChart.tsx";
-import LineChart from "@/components/graphs/LineChart.tsx";
-
 const Home = () => {
   return (
     <div className="w-full h-full p-6">
       <h1 className="text-3xl font-bold">🏠 Home</h1>
       <p>Benvenuto nel sistema di simulazione!</p>
-      <BarChart/>
-      <LineChart/>
-      {/*<PieChart/>*/ }
+      <i>Questa pagina è ancora work in progress... torna fra qualche ora che dovrebbero esserci novità</i>
     </div>
   );
 };

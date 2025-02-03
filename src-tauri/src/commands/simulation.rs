@@ -50,6 +50,55 @@ pub fn send_remove_sender_command(
         .send_remove_sender_command(drone_id as NodeId, target_id as NodeId)
 }
 
+#[tauri::command]
+pub fn add_neighbor(
+    state: State<Arc<Mutex<NetworkState>>>,
+    node_id: NodeId,
+    neighbor_id: NodeId,
+) -> Result<(), String> {
+    let mut state = state.lock();
+
+    if node_id == neighbor_id {
+        return Err("Un nodo non può essere connesso a se stesso.".to_string());
+    }
+    // Assicuriamoci che entrambi i nodi esistano nella rete
+    if !state.graph.node_info.contains_key(&node_id) {
+        return Err(format!("Nodo {} non trovato nella rete.", node_id));
+    }
+    if !state.graph.node_info.contains_key(&neighbor_id) {
+        return Err(format!("Nodo {} non trovato nella rete.", neighbor_id));
+    }
+
+    state.send_add_sender_command(node_id, neighbor_id)?;
+    state.send_add_sender_command(neighbor_id, node_id)?;
+
+    Ok(())
+}
+// TODO: aggiornare il grafo
+#[tauri::command]
+pub fn remove_neighbor(
+    state: State<Arc<Mutex<NetworkState>>>,
+    node_id: NodeId,
+    neighbor_id: NodeId,
+) -> Result<(), String> {
+    let mut state = state.lock();
+
+    if node_id == neighbor_id {
+        return Err("Un nodo non può essere scollegato da se stesso.".to_string());
+    }
+    if !state.graph.node_info.contains_key(&node_id) {
+        return Err(format!("Nodo {} non trovato nella rete.", node_id));
+    }
+    if !state.graph.node_info.contains_key(&neighbor_id) {
+        return Err(format!("Nodo {} non trovato nella rete.", neighbor_id));
+    }
+
+    state.send_remove_sender_command(node_id, neighbor_id)?;
+    state.send_remove_sender_command(neighbor_id, node_id)?;
+
+    Ok(())
+}
+
 /// Sends a packet from a specific sender to the network.
 #[tauri::command]
 pub fn send_packet(
