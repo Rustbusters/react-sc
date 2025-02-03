@@ -1,6 +1,7 @@
 use crate::error::NetworkError;
 use crate::network::network_node::{initialize_clients, initialize_drones, initialize_servers};
 use crate::network::validation::validate_graph;
+use crate::utils::ControllerEvent;
 use common_utils::{HostCommand, HostEvent};
 use crossbeam_channel::{Receiver, Sender};
 use log::{debug, error, info, trace};
@@ -38,51 +39,51 @@ pub enum NodeType {
     Server,
 }
 
-const MAX_HISTORY: usize = 1000;
+const MAX_HISTORY: usize = 100000;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
-pub enum DroneStatsType {
+pub enum NodeStatsType {
     PacketsSent,
     PacketsDropped,
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct DroneEventLog {
+pub struct NodeEventLog {
     pub timestamp: u64,
-    pub event_type: DroneStatsType,
+    pub event_type: NodeStatsType,
 }
 
-/// Granular statistics for each drone. You can extend this as needed.
+/// Granular statistics for each node.
 #[derive(Debug, Default)]
-pub struct DroneStats {
-    pub events: VecDeque<DroneEventLog>,
+pub struct NodeStats {
+    pub events: VecDeque<NodeEventLog>,
 }
 
-impl DroneStats {
+impl NodeStats {
     /// Record a sent packet event.
     pub fn record_sent_packet(&mut self) {
-        self.record_event(DroneStatsType::PacketsSent);
+        self.record_event(NodeStatsType::PacketsSent);
     }
 
     /// Record a dropped packet event.
     pub fn record_dropped_packet(&mut self) {
-        self.record_event(DroneStatsType::PacketsDropped);
+        self.record_event(NodeStatsType::PacketsDropped);
     }
 
-    /// Returns a copy of the events for this drone.
-    pub fn get_events(&self) -> Vec<DroneEventLog> {
+    /// Returns a copy of the events for this node.
+    pub fn get_events(&self) -> Vec<NodeEventLog> {
         self.events.iter().cloned().collect()
     }
 
     /// Internal helper to record an event with a timestamp.
-    fn record_event(&mut self, event_type: DroneStatsType) {
+    fn record_event(&mut self, event_type: NodeStatsType) {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or_default();
 
-        self.events.push_back(DroneEventLog {
+        self.events.push_back(NodeEventLog {
             timestamp,
             event_type,
         });
@@ -119,11 +120,11 @@ pub struct NetworkState {
     /// Channels to communicate with servers from the simulation controller.
     pub server_controller_channels: HashMap<NodeId, (Sender<HostCommand>, Receiver<HostEvent>)>,
 
-    /// Granular stats for each drone: NodeId -> DroneStats
-    pub drone_stats: HashMap<NodeId, DroneStats>,
+    /// Granular stats for each drone: NodeId -> NodeStats
+    pub node_stats: HashMap<NodeId, NodeStats>,
 
-    /// A list of received messages for each drone.
-    pub received_messages: Vec<(u32, DroneEvent)>,
+    /// A list of received messages for each node.
+    pub received_messages: Vec<ControllerEvent>,
 }
 
 impl NetworkState {
@@ -137,7 +138,7 @@ impl NetworkState {
             drones_controller_channels: HashMap::new(),
             client_controller_channels: HashMap::new(),
             server_controller_channels: HashMap::new(),
-            drone_stats: HashMap::new(),
+            node_stats: HashMap::new(),
             received_messages: Vec::new(),
         }
     }
@@ -216,7 +217,7 @@ impl NetworkState {
         self.drones_controller_channels.clear();
         self.client_controller_channels.clear();
         self.server_controller_channels.clear();
-        self.drone_stats.clear();
+        self.node_stats.clear();
         self.graph = GraphState::default();
 
         // Store the newly loaded config
@@ -245,7 +246,7 @@ impl NetworkState {
         self.drones_controller_channels.clear();
         self.client_controller_channels.clear();
         self.server_controller_channels.clear();
-        self.drone_stats.clear();
+        self.node_stats.clear();
         self.graph = GraphState::default();
 
         // Build the custom graph from the cloned config
@@ -264,21 +265,19 @@ impl NetworkState {
             let (sender, receiver) = crossbeam_channel::unbounded();
             self.inter_node_channels
                 .insert(drone.id, (sender, receiver));
+            self.node_stats.insert(drone.id, NodeStats::default());
         }
         for client in &local_config.client {
             let (sender, receiver) = crossbeam_channel::unbounded();
             self.inter_node_channels
                 .insert(client.id, (sender, receiver));
+            self.node_stats.insert(client.id, NodeStats::default());
         }
         for server in &local_config.server {
             let (sender, receiver) = crossbeam_channel::unbounded();
             self.inter_node_channels
                 .insert(server.id, (sender, receiver));
-        }
-
-        // Initialize drone_stats for each drone in the config
-        for drone in &local_config.drone {
-            self.drone_stats.insert(drone.id, DroneStats::default());
+            self.node_stats.insert(server.id, NodeStats::default());
         }
 
         // Finally, spawn node threads
@@ -496,27 +495,27 @@ impl NetworkState {
     // Example of how you might record stats in a centralized way.
     // --------------------------------------------------------------------------
 
-    /// Increment the packets_sent counter for a given drone.
-    pub fn record_drone_sent_packet(&mut self, drone_id: NodeId) {
-        if let Some(stats) = self.drone_stats.get_mut(&drone_id) {
+    /// Increment the packets_sent counter for a given node.
+    pub fn record_node_sent_packet(&mut self, node_id: NodeId) {
+        if let Some(stats) = self.node_stats.get_mut(&node_id) {
             stats.record_sent_packet();
         }
     }
 
-    /// Increment the packets_dropped counter for a given drone.
-    pub fn record_drone_dropped_packet(&mut self, drone_id: NodeId) {
-        if let Some(stats) = self.drone_stats.get_mut(&drone_id) {
+    /// Increment the packets_dropped counter for a given node.
+    pub fn record_node_dropped_packet(&mut self, node_id: NodeId) {
+        if let Some(stats) = self.node_stats.get_mut(&node_id) {
             stats.record_dropped_packet();
         }
     }
 
-    /// Returns the stats for a specific drone, if available.
-    pub fn get_drone_stats(&self, drone_id: NodeId) -> Option<&DroneStats> {
-        self.drone_stats.get(&drone_id)
+    /// Returns the stats for a specific node, if available.
+    pub fn get_node_stats(&self, node_id: NodeId) -> Option<&NodeStats> {
+        self.node_stats.get(&node_id)
     }
 
-    /// Returns a reference to the entire drone_stats map.
-    pub fn get_all_drone_stats(&self) -> &HashMap<NodeId, DroneStats> {
-        &self.drone_stats
+    /// Returns a reference to the entire node_stats map.
+    pub fn get_all_node_stats(&self) -> &HashMap<NodeId, NodeStats> {
+        &self.node_stats
     }
 }

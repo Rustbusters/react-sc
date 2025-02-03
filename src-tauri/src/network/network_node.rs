@@ -5,6 +5,7 @@ use crossbeam_channel::{unbounded, Sender};
 use log::info;
 use rustbusters_drone::RustBustersDrone;
 use serde::de::Error;
+use server::utils::traits::Runnable;
 use server::{RustBustersServer, RustBustersServerController};
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
@@ -245,9 +246,9 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
         .ok_or(NetworkError::NoConfigLoaded)?;
 
     let (http_server_address, http_public_path, ws_server_address) = config_server_controller();
-    let server_controller =
+    let mut server_controller =
         RustBustersServerController::new(http_server_address, http_public_path, ws_server_address);
-    server_controller.launch();
+    server_controller.run();
 
     for server in &config.server {
         let (cmd_tx, cmd_rx) = unbounded::<common_utils::HostCommand>();
@@ -300,7 +301,7 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
                 packet_recv,
                 None,
             );
-            server_host.launch();
+            server_host.run().unwrap();
         });
 
         state.node_threads.insert(server.id, handle);

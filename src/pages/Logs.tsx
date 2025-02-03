@@ -117,8 +117,9 @@ export const Logs = () => {
               ) : (
                 messages.map((message, index) => (
                   <div key={ index } className={ `py-2 border-b border-gray-200 ${ getMessageColor(message.type) }` }>
+                    <span
+                      className="ml-2 text-blue-600">[{ message.type.startsWith("HostEvent") ? "Host" : "Drone" }: { message.node }]</span>
                     <span className="font-bold">[{ message.type }]</span>
-                    <span className="ml-2 text-blue-600">[Drone: { message.node }]</span>
                     <span className="ml-2">{ message.packet }</span>
                   </div>
                 ))
@@ -126,7 +127,6 @@ export const Logs = () => {
             </div>
           </div>
 
-          {/* Sezione: Log Filtrati */ }
           <div>
             <h3 className="text-lg font-semibold text-black mb-2">
               Log Filtrati { nodeFilter && `(Drone: ${ nodeFilter })` }
@@ -176,7 +176,8 @@ export const Logs = () => {
           ) : (
             displayedMessages.map((message, index) => (
               <div key={ index } className={ `py-1 ${ getMessageColor(message.type) }` }>
-                <span className="text-blue-600">[Drone: { message.node }]</span>
+                <span
+                  className="text-blue-600">[{ message.type.startsWith("HostEvent") ? "Host" : "Drone" }: { message.node }]</span>
                 <span className="ml-2 font-semibold">[{ message.type }]</span>
                 <span className="ml-2 text-slate-600">{ message.packet }</span>
               </div>

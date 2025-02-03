@@ -1,10 +1,13 @@
 use crate::network::state::NetworkState;
+use crate::utils::ControllerEvent;
+use common_utils::HostEvent;
 use crossbeam_channel::Receiver;
 use log::{debug, error, info};
 use parking_lot::Mutex;
 use std::sync::Arc;
 use std::thread;
 use wg_2024::controller::DroneEvent;
+use wg_2024::network::NodeId;
 use wg_2024::packet::{Packet, PacketType, FRAGMENT_DSIZE};
 
 pub struct Listener {
@@ -23,78 +26,123 @@ impl Listener {
             let mut events_to_process = Vec::new();
 
             {
-                // Lock state immutably and collect events
                 let state_guard = self.state.lock();
 
-                // Collect drone events
                 for (&node_id, (_, drone_receiver)) in state_guard.drones_controller_channels.iter()
                 {
                     if let Ok(event) = drone_receiver.try_recv() {
-                        events_to_process.push((node_id, event));
+                        events_to_process.push(ControllerEvent::Drone { node_id, event });
                     }
                 }
 
-                // Collect client events
                 for (&node_id, (_, client_receiver)) in
                     state_guard.client_controller_channels.iter()
                 {
                     if let Ok(event) = client_receiver.try_recv() {
-                        info!("[LISTENER] - [CLIENT {}] : {:?}", node_id, event);
+                        events_to_process.push(ControllerEvent::Host { node_id, event });
                     }
                 }
 
-                // Collect server events
                 for (&node_id, (_, server_receiver)) in
                     state_guard.server_controller_channels.iter()
                 {
                     if let Ok(event) = server_receiver.try_recv() {
-                        info!("[LISTENER] - [SERVER {}] : {:?}", node_id, event);
+                        events_to_process.push(ControllerEvent::Host { node_id, event });
                     }
                 }
             }
 
             let mut state_guard = self.state.lock();
-            for (node_id, event) in events_to_process {
-                info!(
-                    "[LISTENER] DroneController received for drone {}: {:?}",
-                    node_id, event
-                );
-
-                state_guard.received_messages.push((node_id as u32, event.clone()));
-
+            for event in events_to_process {
                 match event {
-                    DroneEvent::PacketSent(packet) => {
-                        debug!("[LISTENER] - [DRONE {}] PacketSent: {:?}", node_id, packet);
-                        state_guard.record_drone_sent_packet(node_id);
-                    }
-                    DroneEvent::PacketDropped(packet) => {
+                    ControllerEvent::Drone { node_id, event } => {
                         debug!(
-                            "[LISTENER] - [DRONE {}] PacketDropped: {:?}",
-                            node_id, packet
+                            "[LISTENER] DroneController received for drone {}: {:?}",
+                            node_id, event
                         );
-                        state_guard.record_drone_dropped_packet(node_id);
-                    }
-                    DroneEvent::ControllerShortcut(packet) => {
-                        match packet.pack_type {
-                            PacketType::Ack(_)
-                            | PacketType::Nack(_)
-                            | PacketType::FloodResponse(_) => {
-                                // Unlock before calling another function
-                                self.send_packet_to_destination(packet);
+                        state_guard.received_messages.push(ControllerEvent::Drone {
+                            node_id,
+                            event: event.clone(),
+                        });
+
+                        match event {
+                            DroneEvent::PacketSent(packet) => {
+                                debug!("[LISTENER] - [DRONE {}] PacketSent: {:?}", node_id, packet);
+                                state_guard.record_node_sent_packet(node_id);
                             }
-                            _ => {
-                                error!(
-                                    "[LISTENER] - [DRONE {}] Unexpected packet received: {:?}",
+                            DroneEvent::PacketDropped(packet) => {
+                                debug!(
+                                    "[LISTENER] - [DRONE {}] PacketDropped: {:?}",
                                     node_id, packet
                                 );
+                                state_guard.record_node_dropped_packet(node_id);
                             }
+                            DroneEvent::ControllerShortcut(packet) => match packet.pack_type {
+                                PacketType::Ack(_)
+                                | PacketType::Nack(_)
+                                | PacketType::FloodResponse(_) => {
+                                    self.send_packet_to_destination(packet);
+                                }
+                                _ => {
+                                    error!(
+                                        "[LISTENER] - [DRONE {}] Unexpected packet received: {:?}",
+                                        node_id, packet
+                                    );
+                                }
+                            },
+                        }
+                    }
+                    ControllerEvent::Host { node_id, event } => {
+                        debug!(
+                            "[LISTENER] HostController received for host {}: {:?}",
+                            node_id, event
+                        );
+                        state_guard.received_messages.push(ControllerEvent::Host {
+                            node_id,
+                            event: event.clone(),
+                        });
+
+                        match event {
+                            HostEvent::HostMessageSent(packet) => {
+                                debug!(
+                                    "[LISTENER] - [HOST {}] HostMessageSent: {:?}",
+                                    node_id, packet
+                                );
+                                state_guard.record_node_sent_packet(node_id);
+                            }
+                            HostEvent::HostMessageReceived(packet) => {
+                                debug!(
+                                    "[LISTENER] - [HOST {}] HostMessageReceived: {:?}",
+                                    node_id, packet
+                                );
+                                // TODO: gestire questo caso
+                            }
+                            HostEvent::StatsResponse(stats) => {
+                                debug!(
+                                    "[LISTENER] - [HOST {}] StatsResponse: {:?}",
+                                    node_id, stats
+                                );
+                                // TODO: gestire questo caso
+                            }
+                            HostEvent::ControllerShortcut(packet) => match packet.pack_type {
+                                PacketType::Ack(_)
+                                | PacketType::Nack(_)
+                                | PacketType::FloodResponse(_) => {
+                                    self.send_packet_to_destination(packet);
+                                }
+                                _ => {
+                                    error!(
+                                        "[LISTENER] - [HOST {}] Unexpected packet received: {:?}",
+                                        node_id, packet
+                                    );
+                                }
+                            },
                         }
                     }
                 }
             }
 
-            // drop(state_guard); // Explicit drop before sleeping (optional)
-            // thread::sleep(std::time::Duration::from_millis(10)); // TODO: Make this configurable
+            // thread::sleep(std::time::Duration::from_millis(10));
         });
     }
 

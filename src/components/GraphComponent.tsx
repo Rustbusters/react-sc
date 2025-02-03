@@ -168,7 +168,7 @@ const GraphComponent = ({ onNodeSelect }: GraphComponentProps) => {
         {
           selector: "edge:selected",
           style: {
-            "line-color": "#ff6b6b",
+            "line-color": "#0284c7",
             width: 3,
           },
         },

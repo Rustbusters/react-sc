@@ -3,6 +3,7 @@ mod error;
 mod listener;
 mod network;
 mod simulation;
+mod utils;
 
 use crate::commands::simulation::send_remove_sender_command;
 use crate::commands::{
@@ -32,7 +33,7 @@ pub fn run() {
                 if cfg!(debug_assertions) {
                     app.handle().plugin(
                         tauri_plugin_log::Builder::default()
-                            .level(log::LevelFilter::Info)
+                            .level(log::LevelFilter::Error)
                             .filter(|metadata| metadata.target().starts_with("reactsc"))
                             .build(),
                     )?;

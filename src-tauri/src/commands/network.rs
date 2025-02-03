@@ -47,7 +47,7 @@ pub fn stop_network(state: TauriState<Arc<Mutex<NetworkState>>>) -> Result<(), S
     net_state.drones_controller_channels.clear();
     net_state.client_controller_channels.clear();
     net_state.server_controller_channels.clear();
-    net_state.drone_stats.clear();
+    net_state.node_stats.clear();
     net_state.graph = GraphState::default();
 
     info!("Network stopped successfully");
