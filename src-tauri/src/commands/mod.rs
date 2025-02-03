@@ -4,7 +4,7 @@ pub mod simulation;
 pub mod stats;
 
 pub use config::{get_config, load_config};
-pub use network::{start_network, stop_network};
+pub use network::{start_network, stop_network, get_network_status};
 pub use simulation::{
     add_neighbor, get_graph, remove_neighbor, send_crash_command, send_packet, send_set_pdr_command,
 };

@@ -94,11 +94,21 @@ impl NodeStats {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum NetworkStatus {
+    Init,
+    Stopped,
+    Running,
+}
+
 /// Main structure holding the network state and runtime data.
 pub struct NetworkState {
     /// The initial configuration of the network (static, read-only).
     /// This config is never mutated after loading.
     pub initial_config: Option<Config>,
+
+    /// The current status of the network.
+    status: NetworkStatus,
 
     /// Custom adjacency graph and node metadata for the *current* network.
     pub graph: GraphState,
@@ -132,6 +142,7 @@ impl NetworkState {
     pub fn new() -> Self {
         NetworkState {
             initial_config: None,
+            status: NetworkStatus::Init,
             graph: GraphState::default(),
             node_threads: HashMap::new(),
             inter_node_channels: HashMap::new(),
@@ -280,6 +291,7 @@ impl NetworkState {
             self.node_stats.insert(server.id, NodeStats::default());
         }
 
+        self.status = NetworkStatus::Running;
         // Finally, spawn node threads
         initialize_drones(self)?;
         initialize_clients(self)?;
@@ -452,14 +464,13 @@ impl NetworkState {
         node_type: &NodeType,
         target_id: NodeId,
     ) -> Result<(), NetworkError> {
-
         let target_sender = self
             .inter_node_channels
             .get(&target_id)
             .ok_or(NetworkError::ChannelNotFound(target_id))?
             .0
             .clone();
-        
+
         match node_type {
             NodeType::Drone => {
                 if let Some(sender) = self.drones_controller_channels.get(&node_id) {
@@ -606,5 +617,13 @@ impl NetworkState {
             .node_info
             .get(&node_id)
             .map(|meta| meta.node_type.clone())
+    }
+
+    pub fn get_status(&self) -> NetworkStatus {
+        self.status.clone()
+    }
+
+    pub fn set_status(&mut self, status: NetworkStatus) {
+        self.status = status;
     }
 }
