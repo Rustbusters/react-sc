@@ -33,7 +33,8 @@ dotenv = "0.15"
 wg_2024 = { git = "https://github.com/WGL-2024/WGL_repo_2024.git", features = ["serialize"] }
 rustbusters-drone = { git = "ssh://github.com/Rustbusters/drone.git", branch = "dev/safe-sounds" }
 client = { git = "https://github.com/Rustbusters/client.git" }
-server = { git = "https://github.com/Rustbusters/server.git" }
+#server = { git = "https://github.com/Rustbusters/server.git" }
+server = { path = "../../server" }
 common-utils = { git = "https://github.com/Rustbusters/common-utils.git" }
 rusty_drones = { git = "https://github.com/rusty-drone-2024/rusty-drone.git" }
 lockheedrustin-drone = { git = "https://github.com/Lockheed-Rustin/drone.git" }

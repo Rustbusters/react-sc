@@ -1,7 +1,8 @@
 use crate::error::NetworkError;
 use crate::network::state::NetworkState;
 use client::RustbustersClient;
-use crossbeam_channel::{unbounded, Sender};
+use common_utils::HostCommand;
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use log::info;
 use rustbusters_drone::RustBustersDrone;
 use serde::de::Error;
@@ -245,9 +246,19 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
         .as_ref()
         .ok_or(NetworkError::NoConfigLoaded)?;
 
-    let (http_server_address, http_public_path, ws_server_address) = config_server_controller();
-    let mut server_controller =
-        RustBustersServerController::new(http_server_address, http_public_path, ws_server_address);
+    let (
+        http_server_address,
+        http_public_path,
+        ws_server_address,
+        server_controller_sender,
+        server_controller_receiver,
+    ) = config_server_controller();
+    let mut server_controller = RustBustersServerController::new(
+        http_server_address,
+        http_public_path,
+        ws_server_address,
+        server_controller_receiver,
+    );
     server_controller.run();
 
     for server in &config.server {
@@ -292,6 +303,8 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
         }
 
         let server_clone = server.clone();
+        let server_controller_sender_clone = server_controller_sender.clone();
+        
         let handle = thread::spawn(move || {
             let mut server_host = RustBustersServer::new(
                 server_clone.id,
@@ -299,6 +312,7 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
                 cmd_rx,
                 packet_send,
                 packet_recv,
+                server_controller_sender_clone,
                 None,
             );
             server_host.run().unwrap();
@@ -310,7 +324,13 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
     Ok(())
 }
 
-fn config_server_controller() -> (String, String, String) {
+fn config_server_controller() -> (
+    String,
+    String,
+    String,
+    Sender<HostCommand>,
+    Receiver<HostCommand>,
+) {
     info!("Reading server configuration from .env file");
     let server_ip: [u8; 4] = env::var("SERVER_IP")
         .expect("SERVER_IP must be set in .env file")
@@ -338,5 +358,13 @@ fn config_server_controller() -> (String, String, String) {
     info!("HTTP server address: {}", http_server_address);
     info!("WS server address: {}", ws_server_address);
 
-    (http_server_address, http_public_path, ws_server_address)
+    let (sender, receiver) = unbounded::<HostCommand>();
+
+    (
+        http_server_address,
+        http_public_path,
+        ws_server_address,
+        sender,
+        receiver,
+    )
 }
