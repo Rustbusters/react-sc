@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 
 interface GraphComponentProps {
   onNodeSelect: (nodeId: string | null) => void;
+  setRefreshGraph: (refreshFunction: () => void) => void;
 }
 
-const GraphComponent = ({ onNodeSelect }: GraphComponentProps) => {
+const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) => {
   const cyRef = useRef<HTMLDivElement>(null);
   const [cy, setCy] = useState<cytoscape.Core | null>(null);
 
@@ -234,6 +235,10 @@ const GraphComponent = ({ onNodeSelect }: GraphComponentProps) => {
       });
     }
   }, [cy, loadGraphData]);
+
+  useEffect(() => {
+    setRefreshGraph(() => loadGraphData);
+  }, [loadGraphData, setRefreshGraph]);
 
   return (
     <div className="relative flex flex-col h-full w-full">

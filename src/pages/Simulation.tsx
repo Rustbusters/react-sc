@@ -6,12 +6,14 @@ import NodeDetails from "@/components/NodeDetails.tsx";
 
 const Simulation = () => {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [refreshGraph, setRefreshGraph] = useState<() => void>(() => () => {
+  });
 
   return (
     <div className="flex flex-col w-full h-full">
       <div className="flex flex-1">
         <div className="flex-1 w-full h-full">
-          <GraphComponent onNodeSelect={ setSelectedNode }/>
+          <GraphComponent onNodeSelect={ setSelectedNode } setRefreshGraph={ setRefreshGraph }/>
         </div>
         <div className="w-1/2 ">
           <NetworkInfos/>
@@ -24,7 +26,8 @@ const Simulation = () => {
           <SheetHeader>
             {/*<SheetTitle> Dettagli del Nodo </SheetTitle>*/ }
           </SheetHeader>
-          { selectedNode && <NodeDetails nodeId={ selectedNode } onClose={ () => setSelectedNode(null) }/> }
+          { selectedNode && <NodeDetails nodeId={ selectedNode } onClose={ () => setSelectedNode(null) }
+                                         refreshGraph={ refreshGraph }/> }
         </SheetContent>
       </Sheet>
     </div>

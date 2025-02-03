@@ -6,9 +6,10 @@ import { Input } from "@/components/ui/input";
 interface NodeDetailsProps {
   nodeId: string;
   onClose: () => void;
+  refreshGraph: () => void;
 }
 
-const NodeDetails = ({ nodeId, onClose }: NodeDetailsProps) => {
+const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
   const [nodeType, setNodeType] = useState<string | null>(null);
   const [neighbors, setNeighbors] = useState<string[]>([]);
   const [pdr, setPdr] = useState<number | null>(null);
@@ -51,6 +52,7 @@ const NodeDetails = ({ nodeId, onClose }: NodeDetailsProps) => {
       await invoke("add_neighbor", { nodeId: Number(nodeId), neighborId: Number(newNeighbor) });
       setNeighbors((prev) => [...prev, newNeighbor]);
       setNewNeighbor("");
+      refreshGraph();
     } catch (error) {
       console.error("Errore nell'aggiunta del vicino:", error);
     }
@@ -61,6 +63,7 @@ const NodeDetails = ({ nodeId, onClose }: NodeDetailsProps) => {
     try {
       await invoke("remove_neighbor", { nodeId: Number(nodeId), neighborId: Number(neighborId) });
       setNeighbors((prev) => prev.filter((n) => n !== neighborId));
+      refreshGraph();
     } catch (error) {
       console.error("Errore nella rimozione del vicino:", error);
     }
@@ -72,6 +75,7 @@ const NodeDetails = ({ nodeId, onClose }: NodeDetailsProps) => {
         droneId: parseInt(nodeId, 10),
       });
       alert(`Il nodo ${ nodeId } è stato crashato!`);
+      refreshGraph();
       onClose();
     } catch (error) {
       console.error("Errore nel crash del nodo:", error);
