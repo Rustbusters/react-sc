@@ -189,16 +189,19 @@ const Settings = () => {
           { historyConfigs.map((config) => (
             <div key={ config.id }
                  className="flex justify-between items-center p-3 border rounded-lg shadow-sm bg-white">
-              <div>
+              <div className="grow truncate text-ellipsis">
                 <p className="font-medium">{ config.name }</p>
                 <p className="text-xs text-gray-500">{ new Date(config.timestamp * 1000).toLocaleString() }</p>
               </div>
-              <Button size="sm" variant="ghost" onClick={ () => handleLoadConfig(config.path) }>
-                <Upload className="w-4 h-4"/>
-              </Button>
-              <Button size="sm" variant="destructive" onClick={ () => handleDeleteConfig(config.path) }>
-                <Trash className="w-4 h-4"/>
-              </Button>
+
+              <div className="flex flex-row gap-2">
+                <Button size="sm" variant="ghost" onClick={ () => handleLoadConfig(config.path) }>
+                  <Upload className="w-4 h-4"/>
+                </Button>
+                <Button size="sm" variant="destructive" onClick={ () => handleDeleteConfig(config.path) }>
+                  <Trash className="w-4 h-4"/>
+                </Button>
+              </div>
             </div>
           )) }
         </div>
