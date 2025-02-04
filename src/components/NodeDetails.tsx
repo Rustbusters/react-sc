@@ -132,7 +132,7 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
     try {
       await invoke("send_set_pdr_command", {
         droneId: parseInt(nodeId, 10),
-        pdr: newPdr,
+        pdr: Math.round(newPdr * 100),
       });
       setPdr(newPdr);
     } catch (error) {

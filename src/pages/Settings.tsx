@@ -4,12 +4,11 @@ import { Input } from "@/components/ui/input";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "react-hot-toast";
-import { join, resolveResource } from "@tauri-apps/api/path";
+import { join } from "@tauri-apps/api/path";
 import { exists, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { File, FolderOpen, Trash, Upload } from "lucide-react"; // Import delle icone
+import { File, FolderOpen, Trash, Upload } from "lucide-react";
 
 // 📌 Costanti delle cartelle
-const DEFAULT_CONFIGS_DIR = "default_configs";
 const LAST_CONFIG_FILE = "last_config.txt";
 
 // 📌 Definizione del tipo ConfigFile
@@ -29,13 +28,6 @@ const Settings = () => {
   const getLastConfigFilePath = async (): Promise<string> => {
     const historyDir = await invoke<string>("get_history_dir");
     return join(historyDir, LAST_CONFIG_FILE);
-  };
-
-  // 📌 Ottiene il percorso della directory (default_configs o history)
-  const getAppPath = async (folder: string): Promise<string> => {
-    return folder === DEFAULT_CONFIGS_DIR
-      ? resolveResource(DEFAULT_CONFIGS_DIR)
-      : invoke("get_history_dir");
   };
 
   // 📌 Carica le configurazioni predefinite e la cronologia

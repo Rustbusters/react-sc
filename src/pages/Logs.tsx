@@ -6,13 +6,17 @@ import { Label } from "@/components/ui/label";
 import { ArrowDownToLine } from "lucide-react";
 
 interface Message {
+  id: number;
   type: string;
   node: number;
   packet: string;
 }
 
+const MAX_MESSAGES = 1000; // Limite massimo di messaggi memorizzabili
+
 export const Logs = () => {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [lastMessageId, setLastMessageId] = useState<number>(0);
   const [nodeFilter, setNodeFilter] = useState<string>("");
   const [isAtBottom, setIsAtBottom] = useState<boolean>(true);
 
@@ -20,8 +24,26 @@ export const Logs = () => {
 
   const fetchAndDisplayMessages = async () => {
     try {
-      const response = await invoke<{ messages: Message[] }>("get_received_messages");
-      setMessages(response.messages);
+      const response = await invoke<{ messages: Message[] }>("get_new_messages", {
+        lastId: lastMessageId,
+        maxMessages: MAX_MESSAGES,
+      });
+
+      if (response.messages.length > 0) {
+        setMessages((prev) => {
+          const newMessages = [...prev, ...response.messages];
+
+          // Se superiamo il limite, manteniamo solo gli ultimi MAX_MESSAGES
+          if (newMessages.length > MAX_MESSAGES) {
+            return newMessages.slice(newMessages.length - MAX_MESSAGES);
+          }
+
+          return newMessages;
+        });
+
+        // Aggiorniamo l'ultimo ID ricevuto con l'ID dell'ultimo messaggio ricevuto
+        setLastMessageId(response.messages[response.messages.length - 1].id);
+      }
     } catch (error) {
       console.error("Failed to fetch messages:", error);
     }
@@ -31,7 +53,7 @@ export const Logs = () => {
     fetchAndDisplayMessages();
     const interval = setInterval(fetchAndDisplayMessages, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [lastMessageId]);
 
   useEffect(() => {
     if (isAtBottom) {
@@ -109,8 +131,8 @@ export const Logs = () => {
         { filteredMessages.length === 0 ? (
           <p className="text-muted-foreground text-center">Nessun messaggio ricevuto...</p>
         ) : (
-          filteredMessages.map((message, index) => (
-            <div key={ index } className={ `py-1 text-xs ${ getMessageColor(message.type) }` }>
+          filteredMessages.map((message) => (
+            <div key={ message.id } className={ `py-1 text-xs ${ getMessageColor(message.type) }` }>
               <span className="text-blue-600">
                 [{ message.type.startsWith("HostEvent") ? "Host" : "Drone" }: { message.node }]
               </span>

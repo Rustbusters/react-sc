@@ -9,7 +9,7 @@ use crate::commands::{
     add_neighbor, delete_history_config, get_all_drones_history, get_all_drones_statistics,
     get_config, get_default_configs, get_default_configs_dir, get_drone_history,
     get_drone_statistics, get_global_statistics, get_graph, get_history_configs, get_history_dir,
-    get_host_stats, get_network_infos, get_network_status, get_node_info, get_received_messages,
+    get_host_stats, get_network_infos, get_network_status, get_new_messages, get_node_info,
     load_config, remove_neighbor, save_config_to_history, send_crash_command, send_packet,
     send_set_pdr_command, start_network, stop_network,
 };
@@ -35,7 +35,7 @@ pub fn run() {
                 if cfg!(debug_assertions) {
                     app.handle().plugin(
                         tauri_plugin_log::Builder::default()
-                            .level(log::LevelFilter::Debug)
+                            .level(log::LevelFilter::Off)
                             // .filter(|metadata| metadata.target().starts_with("reactsc"))
                             .build(),
                     )?;
@@ -84,7 +84,7 @@ pub fn run() {
             get_all_drones_history,
             get_all_drones_statistics,
             get_global_statistics,
-            get_received_messages,
+            get_new_messages,
             get_network_infos,
             get_node_info,
             get_host_stats,

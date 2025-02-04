@@ -144,51 +144,71 @@ pub fn get_global_statistics(state: State<Arc<Mutex<NetworkState>>>) -> Value {
 }
 
 #[tauri::command]
-pub fn get_received_messages(state: State<Arc<Mutex<NetworkState>>>) -> Value {
+pub fn get_new_messages(
+    state: State<Arc<Mutex<NetworkState>>>,
+    last_id: usize,
+    max_messages: usize,
+) -> Value {
     let state = state.lock();
-    let messages: Vec<Value> = state
-        .received_messages
+    let total_messages = state.received_messages.len();
+
+    // Calcoliamo il punto di inizio senza scorrere tutta la lista
+    let start_index = total_messages.saturating_sub(max_messages).max(last_id);
+
+    // Estraiamo solo i messaggi rilevanti con ID basato sull'indice
+    let messages: Vec<Value> = state.received_messages[start_index..]
         .iter()
-        .map(|event| match event {
-            ControllerEvent::Drone { node_id, event } => match event {
-                DroneEvent::PacketSent(packet) => json!({
-                    "type": "DroneEvent::PacketSent",
-                    "node": node_id,
-                    "packet": format!("{:?}", packet)
-                }),
-                DroneEvent::PacketDropped(packet) => json!({
-                    "type": "DroneEvent::PacketDropped",
-                    "node": node_id,
-                    "packet": format!("{:?}", packet)
-                }),
-                DroneEvent::ControllerShortcut(packet) => json!({
-                    "type": "DroneEvent::ControllerShortcut",
-                    "node": node_id,
-                    "packet": format!("{:?}", packet)
-                }),
-            },
-            ControllerEvent::Host { node_id, event } => match event {
-                HostEvent::HostMessageSent(message) => json!({
-                    "type": "HostEvent::HostMessageSent",
-                    "node": node_id,
-                    "message": format!("{:?}", message)
-                }),
-                HostEvent::HostMessageReceived(message) => json!({
-                    "type": "HostEvent::HostMessageReceived",
-                    "node": node_id,
-                    "message": format!("{:?}", message)
-                }),
-                HostEvent::StatsResponse(stats) => json!({
-                    "type": "HostEvent::StatsResponse",
-                    "node": node_id,
-                    "stats": format!("{:?}", stats)
-                }),
-                HostEvent::ControllerShortcut(packet) => json!({
-                    "type": "HostEvent::ControllerShortcut",
-                    "node": node_id,
-                    "packet": format!("{:?}", packet)
-                }),
-            },
+        .enumerate()
+        .map(|(idx, event)| {
+            let message_id = start_index + idx;
+            match event {
+                ControllerEvent::Drone { node_id, event } => match event {
+                    DroneEvent::PacketSent(packet) => json!({
+                        "id": message_id,
+                        "type": "DroneEvent::PacketSent",
+                        "node": node_id,
+                        "packet": format!("{:?}", packet)
+                    }),
+                    DroneEvent::PacketDropped(packet) => json!({
+                        "id": message_id,
+                        "type": "DroneEvent::PacketDropped",
+                        "node": node_id,
+                        "packet": format!("{:?}", packet)
+                    }),
+                    DroneEvent::ControllerShortcut(packet) => json!({
+                        "id": message_id,
+                        "type": "DroneEvent::ControllerShortcut",
+                        "node": node_id,
+                        "packet": format!("{:?}", packet)
+                    }),
+                },
+                ControllerEvent::Host { node_id, event } => match event {
+                    HostEvent::HostMessageSent(message) => json!({
+                        "id": message_id,
+                        "type": "HostEvent::HostMessageSent",
+                        "node": node_id,
+                        "message": format!("{:?}", message)
+                    }),
+                    HostEvent::HostMessageReceived(message) => json!({
+                        "id": message_id,
+                        "type": "HostEvent::HostMessageReceived",
+                        "node": node_id,
+                        "message": format!("{:?}", message)
+                    }),
+                    HostEvent::StatsResponse(stats) => json!({
+                        "id": message_id,
+                        "type": "HostEvent::StatsResponse",
+                        "node": node_id,
+                        "stats": format!("{:?}", stats)
+                    }),
+                    HostEvent::ControllerShortcut(packet) => json!({
+                        "id": message_id,
+                        "type": "HostEvent::ControllerShortcut",
+                        "node": node_id,
+                        "packet": format!("{:?}", packet)
+                    }),
+                },
+            }
         })
         .collect();
 
