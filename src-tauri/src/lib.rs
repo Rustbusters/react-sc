@@ -6,10 +6,12 @@ mod simulation;
 mod utils;
 
 use crate::commands::{
-    add_neighbor, get_all_drones_history, get_all_drones_statistics, get_config, get_drone_history,
-    get_drone_statistics, get_global_statistics, get_graph, get_host_stats, get_network_infos,
-    get_network_status, get_node_info, get_received_messages, load_config, remove_neighbor,
-    send_crash_command, send_packet, send_set_pdr_command, start_network, stop_network,
+    add_neighbor, delete_history_config, get_all_drones_history, get_all_drones_statistics,
+    get_config, get_default_configs, get_default_configs_dir, get_drone_history,
+    get_drone_statistics, get_global_statistics, get_graph, get_history_configs, get_history_dir,
+    get_host_stats, get_network_infos, get_network_status, get_node_info, get_received_messages,
+    load_config, remove_neighbor, save_config_to_history, send_crash_command, send_packet,
+    send_set_pdr_command, start_network, stop_network,
 };
 use crate::listener::Listener;
 use crate::network::state::NetworkState;
@@ -59,6 +61,12 @@ pub fn run() {
             // config commands
             load_config,
             get_config,
+            get_history_configs,
+            save_config_to_history,
+            delete_history_config,
+            get_default_configs_dir,
+            get_default_configs,
+            get_history_dir,
             // network commands
             start_network,
             stop_network,

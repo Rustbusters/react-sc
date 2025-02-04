@@ -13,50 +13,28 @@
     "fs:allow-read-text-file",
     "fs:allow-resource-read-recursive",
     {
-      "identifier": "fs:scope",
-      "allow": [
-        {
-          "path": "$RESOURCE/default_configs"
-        },
-        {
-          "path": "$RESOURCE/default_configs/**"
-        },
-        {
-          "path": "$APPDATA/history"
-        },
-        {
-          "path": "$APPDATA/history/**"
-        }
-      ]
-    },
-    {
       "identifier": "fs:allow-read",
       "allow": [
-        {
-          "path": "$RESOURCE/default_configs/**"
-        },
-        {
-          "path": "$APPDATA/history/**"
-        }
+        "$RESOURCE/default_configs/**",
+        "$APPDATA/history/**"
       ]
     },
     {
       "identifier": "fs:allow-write",
       "allow": [
-        {
-          "path": "$APPDATA/history/**"
-        }
+        "$APPDATA/history/**"
       ]
     },
     {
-      "identifier": "fs:allow-read-dir",
+      "identifier": "fs:allow-appdata-write",
       "allow": [
-        {
-          "path": "$RESOURCE/default_configs"
-        },
-        {
-          "path": "$APPDATA/history"
-        }
+        "$APPDATA/history/**"
+      ]
+    },
+    {
+      "identifier": "fs:allow-appdata-write-recursive",
+      "allow": [
+        "$APPDATA/history/**"
       ]
     }
   ]

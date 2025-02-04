@@ -3,7 +3,10 @@ pub mod network;
 pub mod simulation;
 pub mod stats;
 
-pub use config::{get_config, load_config};
+pub use config::{
+    delete_history_config, get_config, get_default_configs_dir, get_history_configs, load_config,
+    save_config_to_history, get_default_configs, get_history_dir
+};
 pub use network::{get_network_status, start_network, stop_network};
 pub use simulation::{
     add_neighbor, get_graph, remove_neighbor, send_crash_command, send_packet, send_set_pdr_command,

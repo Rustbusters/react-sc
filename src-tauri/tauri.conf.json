@@ -28,7 +28,7 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "../default_configs/**/*": "resources/default_configs"
+      "default_configs/**/*": "resources/default_configs"
     }
   }
 }
