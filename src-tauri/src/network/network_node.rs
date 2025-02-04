@@ -1,7 +1,8 @@
 use crate::error::NetworkError;
 use crate::network::state::NetworkState;
 use client::RustbustersClient;
-use crossbeam_channel::{unbounded, Sender};
+use common_utils::{HostCommand, HostEvent};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use log::info;
 use rustbusters_drone::RustBustersDrone;
 use serde::de::Error;
@@ -245,14 +246,24 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
         .as_ref()
         .ok_or(NetworkError::NoConfigLoaded)?;
 
-    let (http_server_address, http_public_path, ws_server_address) = config_server_controller();
-    let mut server_controller =
-        RustBustersServerController::new(http_server_address, http_public_path, ws_server_address);
+    let (
+        http_server_address,
+        http_public_path,
+        ws_server_address,
+        server_controller_sender,
+        server_controller_receiver,
+    ) = config_server_controller();
+    let server_controller = RustBustersServerController::new(
+        http_server_address,
+        http_public_path,
+        ws_server_address,
+        server_controller_receiver,
+    );
     server_controller.run();
 
     for server in &config.server {
-        let (cmd_tx, cmd_rx) = unbounded::<common_utils::HostCommand>();
-        let (evt_tx, evt_rx) = unbounded::<common_utils::HostEvent>();
+        let (cmd_tx, cmd_rx) = unbounded::<HostCommand>();
+        let (evt_tx, evt_rx) = unbounded::<HostEvent>();
 
         state
             .server_controller_channels
@@ -292,17 +303,18 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
         }
 
         let server_clone = server.clone();
-        let handle = thread::spawn(move || {
-            let mut server_host = RustBustersServer::new(
-                server_clone.id,
-                evt_tx,
-                cmd_rx,
-                packet_send,
-                packet_recv,
-                None,
-            );
-            server_host.run().unwrap();
-        });
+
+        let server_istance = RustBustersServer::new(
+            server_clone.id,
+            evt_tx,
+            cmd_rx,
+            packet_send,
+            packet_recv,
+            server_controller_sender.clone(),
+            None,
+        );
+
+        let handle = server_istance.run().unwrap();
 
         state.node_threads.insert(server.id, handle);
     }
@@ -310,7 +322,13 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
     Ok(())
 }
 
-fn config_server_controller() -> (String, String, String) {
+fn config_server_controller() -> (
+    String,
+    String,
+    String,
+    Sender<HostCommand>,
+    Receiver<HostCommand>,
+) {
     info!("Reading server configuration from .env file");
     let server_ip: [u8; 4] = env::var("SERVER_IP")
         .expect("SERVER_IP must be set in .env file")
@@ -338,5 +356,13 @@ fn config_server_controller() -> (String, String, String) {
     info!("HTTP server address: {}", http_server_address);
     info!("WS server address: {}", ws_server_address);
 
-    (http_server_address, http_public_path, ws_server_address)
+    let (sender, receiver) = unbounded::<HostCommand>();
+
+    (
+        http_server_address,
+        http_public_path,
+        ws_server_address,
+        sender,
+        receiver,
+    )
 }
