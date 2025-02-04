@@ -99,6 +99,8 @@ pub fn stop_network(
     net_state.node_stats.clear();
     net_state.graph = GraphState::default();
 
+    net_state.set_status(NetworkStatus::Stopped);
+
     // 🔹 Notifica il frontend che la rete è stata stoppata
     app.emit("network_status_changed", NetworkStatus::Stopped)
         .unwrap_or_else(|err| error!("Failed to emit network status change: {:?}", err));
