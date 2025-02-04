@@ -81,6 +81,7 @@ pub fn stop_network(
 
     // 🔹 Join dei thread dei nodi dopo aver mandato i comandi
     for (node_id, handle) in net_state.node_threads.drain() {
+        info!("Attempting to join thread for node {}", node_id);
         if let Err(e) = handle.join() {
             error!(
                 "Failed to join thread for node {}: {:?}. Force-removing.",
