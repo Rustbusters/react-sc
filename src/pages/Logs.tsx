@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowDownToLine } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { ArrowDownToLine, X } from "lucide-react";
 
 interface Message {
   type: string;
@@ -13,11 +15,9 @@ interface Message {
 export const Logs = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [nodeFilter, setNodeFilter] = useState<string>("");
-  const [isSplit, setIsSplit] = useState<boolean>(false);
   const [isAtBottom, setIsAtBottom] = useState<boolean>(true);
 
   const logsContainerRef = useRef<HTMLDivElement | null>(null);
-  const filteredLogsContainerRef = useRef<HTMLDivElement | null>(null);
 
   const fetchAndDisplayMessages = async () => {
     try {
@@ -37,18 +37,12 @@ export const Logs = () => {
   useEffect(() => {
     if (isAtBottom) {
       logsContainerRef.current?.scrollTo({ top: logsContainerRef.current.scrollHeight, behavior: "smooth" });
-      filteredLogsContainerRef.current?.scrollTo({
-        top: filteredLogsContainerRef.current.scrollHeight,
-        behavior: "smooth"
-      });
     }
-  }, [messages, isSplit]);
+  }, [messages]);
 
-  // Funzione per monitorare lo scroll e aggiornare lo stato
-  const handleScroll = (ref: React.RefObject<HTMLDivElement>) => {
-    if (!ref.current) return;
-    const { scrollTop, scrollHeight, clientHeight } = ref.current;
-    setIsAtBottom(scrollTop + clientHeight >= scrollHeight - 10);
+  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const target = event.currentTarget;
+    setIsAtBottom(target.scrollTop + target.clientHeight >= target.scrollHeight - 10);
   };
 
   const scrollToBottom = () => {
@@ -58,7 +52,7 @@ export const Logs = () => {
   const getMessageColor = (type: string) => {
     switch (type) {
       case "PacketSent":
-        return "text-black font-semibold";
+        return "text-green-600 font-semibold";
       case "PacketDropped":
         return "text-red-500 font-semibold";
       case "ControllerShortcut":
@@ -70,131 +64,70 @@ export const Logs = () => {
 
   const filteredMessages = nodeFilter
     ? messages.filter((msg) => msg.node.toString().includes(nodeFilter))
-    : [];
-
-  const displayedMessages = !isSplit && nodeFilter ? filteredMessages : messages;
+    : messages;
 
   return (
-    <div className="p-6 w-full h-full">
-      <h2 className="text-2xl font-bold">Logs</h2>
-
-      <div className="py-2 flex flex-wrap items-center justify-between gap-3 border-b-2 border-gray-200 mb-2">
-        <div className="flex items-center gap-2">
-          <label htmlFor="nodeFilter" className="text-md font-medium text-black">
+    <div className="h-screen w-full flex flex-col p-6 bg-background space-y-4">
+      {/* Sezione Filtri */ }
+      <Card className="p-4 shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-lg">Filtri</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center gap-3">
+          <Label htmlFor="nodeFilter" className="text-muted-foreground">
             Filtra per Drone:
-          </label>
+          </Label>
           <Input
             id="nodeFilter"
             type="text"
-            placeholder="Inserisci ID Drone (Es. 1)"
+            placeholder="ID Drone (Es. 1)"
             value={ nodeFilter }
             onChange={ (e) => setNodeFilter(e.target.value) }
-            className="border border-gray-400 rounded-lg px-3 py-2 text-black w-40"
+            className="w-32"
           />
           { nodeFilter && (
-            <Button onClick={ () => setNodeFilter("") } className="ml-2">
-              ❌ Reset
+            <Button variant="outline" size="icon" onClick={ () => setNodeFilter("") }>
+              <X size={ 18 }/>
             </Button>
           ) }
-        </div>
-        <Button onClick={ () => setIsSplit(!isSplit) }>
-          { isSplit ? "Unsplit Console" : "Split Console" }
-        </Button>
-      </div>
+        </CardContent>
+      </Card>
 
-      { isSplit ? (
-        <div className="flex flex-col gap-4 relative">
-          {/* Sezione: Tutti i Log */ }
-          <div>
-            <h3 className="text-lg font-semibold text-black mb-2">Tutti i Log</h3>
-            <div
-              ref={ logsContainerRef }
-              onScroll={ () => handleScroll(logsContainerRef) }
-              className="h-[250px] p-4 overflow-y-auto font-mono text-sm border border-gray-300 rounded-md shadow-md"
-            >
-              { messages.length === 0 ? (
-                <p className="text-gray-500 text-center">Nessun messaggio ricevuto...</p>
-              ) : (
-                messages.map((message, index) => (
-                  <div key={ index } className={ `py-2 border-b border-gray-200 ${ getMessageColor(message.type) }` }>
-                    <span
-                      className="ml-2 text-blue-600">[{ message.type.startsWith("HostEvent") ? "Host" : "Drone" }: { message.node }]</span>
-                    <span className="font-bold">[{ message.type }]</span>
-                    <span className="ml-2">{ message.packet }</span>
-                  </div>
-                ))
-              ) }
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-semibold text-black mb-2">
-              Log Filtrati { nodeFilter && `(Drone: ${ nodeFilter })` }
-            </h3>
-            <div
-              ref={ filteredLogsContainerRef }
-              onScroll={ () => handleScroll(filteredLogsContainerRef) }
-              className="h-[250px] p-4 overflow-y-auto font-mono text-sm border border-gray-300 rounded-md shadow-md"
-            >
-              { filteredMessages.length === 0 ? (
-                <p className="text-gray-500 text-center">
-                  { nodeFilter
-                    ? "Nessun messaggio per il drone selezionato."
-                    : "Imposta un filtro per visualizzare log specifici." }
-                </p>
-              ) : (
-                filteredMessages.map((message, index) => (
-                  <div key={ index } className={ `py-2 border-b border-gray-200 ${ getMessageColor(message.type) }` }>
-                    <span className="font-bold">[{ message.type }]</span>
-                    <span className="ml-2 text-blue-600">[Drone: { message.node }]</span>
-                    <span className="ml-2">{ message.packet }</span>
-                  </div>
-                ))
-              ) }
-            </div>
-          </div>
-
-          {/* Bottone per scrollare in basso in modalità split */ }
-          { !isAtBottom && (
-            <Button
-              onClick={ scrollToBottom }
-              className="fixed bottom-10 right-10"
-              variant="outline"
-            >
-              <ArrowDownToLine/>
-            </Button>
-          ) }
-        </div>
-      ) : (
-        <div
+      {/* Sezione Logs */ }
+      <Card className="flex-1 overflow-hidden shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg">Messaggi</CardTitle>
+        </CardHeader>
+        <CardContent
           ref={ logsContainerRef }
-          onScroll={ () => handleScroll(logsContainerRef) }
-          className="h-full py-4 overflow-y-auto font-mono text-sm"
+          onScroll={ handleScroll }
+          className="h-full overflow-y-auto font-mono text-sm p-3 border rounded-lg bg-muted"
         >
-          { displayedMessages.length === 0 ? (
-            <p className="text-gray-500 text-center">Nessun messaggio ricevuto...</p>
+          { filteredMessages.length === 0 ? (
+            <p className="text-muted-foreground text-center">Nessun messaggio ricevuto...</p>
           ) : (
-            displayedMessages.map((message, index) => (
-              <div key={ index } className={ `py-1 ${ getMessageColor(message.type) }` }>
-                <span
-                  className="text-blue-600">[{ message.type.startsWith("HostEvent") ? "Host" : "Drone" }: { message.node }]</span>
+            filteredMessages.map((message, index) => (
+              <div key={ index } className={ `py-1 border-b border-gray-200 ${ getMessageColor(message.type) }` }>
+                <span className="text-blue-600">
+                  [{ message.type.startsWith("HostEvent") ? "Host" : "Drone" }: { message.node }]
+                </span>
                 <span className="ml-2 font-semibold">[{ message.type }]</span>
-                <span className="ml-2 text-slate-600">{ message.packet }</span>
+                <span className="ml-2 text-foreground">{ message.packet }</span>
               </div>
             ))
           ) }
+        </CardContent>
+      </Card>
 
-          {/* Bottone per scrollare in basso */ }
-          { !isAtBottom && (
-            <Button
-              onClick={ scrollToBottom }
-              className="fixed bottom-10 right-10"
-              variant="outline"
-            >
-              <ArrowDownToLine/>
-            </Button>
-          ) }
-        </div>
+      {/* Bottone per Scroll in basso */ }
+      { !isAtBottom && (
+        <Button
+          onClick={ scrollToBottom }
+          className="fixed bottom-10 right-10 shadow-lg animate-bounce"
+          variant="outline"
+        >
+          <ArrowDownToLine size={ 20 }/>
+        </Button>
       ) }
     </div>
   );
