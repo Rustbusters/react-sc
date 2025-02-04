@@ -6,17 +6,19 @@ use log::{debug, error, info};
 use parking_lot::Mutex;
 use std::sync::Arc;
 use std::thread;
+use tauri::{AppHandle, Emitter};
 use wg_2024::controller::DroneEvent;
 use wg_2024::network::NodeId;
 use wg_2024::packet::{Packet, PacketType, FRAGMENT_DSIZE};
 
 pub struct Listener {
     state: Arc<Mutex<NetworkState>>,
+    app: AppHandle,
 }
 
 impl Listener {
-    pub fn new(state: Arc<Mutex<NetworkState>>) -> Self {
-        Self { state }
+    pub fn new(state: Arc<Mutex<NetworkState>>, app: AppHandle) -> Self {
+        Self { state, app }
     }
 
     pub fn start(self) {
@@ -122,7 +124,11 @@ impl Listener {
                                     "[LISTENER] - [HOST {}] StatsResponse: {:?}",
                                     node_id, stats
                                 );
-                                // TODO: gestire questo caso
+                                if let Err(e) =
+                                    self.app.emit("host_stats", (node_id, stats.clone()))
+                                {
+                                    error!("Failed to emit host_stats: {:?}", e);
+                                }
                             }
                             HostEvent::ControllerShortcut(packet) => match packet.pack_type {
                                 PacketType::Ack(_)

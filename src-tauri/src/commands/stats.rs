@@ -1,6 +1,8 @@
+use crate::error::NetworkError;
 use crate::network::state::{NetworkState, NodeStatsType, NodeType};
 use crate::utils::ControllerEvent;
-use common_utils::HostEvent;
+use common_utils::{HostCommand, HostEvent};
+use crossbeam_channel::Sender;
 use parking_lot::Mutex;
 use serde_json::json;
 use serde_json::Value;
@@ -295,5 +297,43 @@ pub fn get_node_info(state: State<Arc<Mutex<NetworkState>>>, node_id: NodeId) ->
         node_data
     } else {
         json!({ "error": "Node not found" })
+    }
+}
+
+#[tauri::command]
+pub fn get_host_stats(
+    state: State<Arc<Mutex<NetworkState>>>,
+    node_id: NodeId,
+) -> Result<(), NetworkError> {
+    let state = state.lock();
+
+    let node_type = state
+        .get_node_type(node_id)
+        .ok_or_else(|| NetworkError::NodeNotFound(node_id.to_string()))?;
+
+    let send_stats_request = |sender: &Sender<HostCommand>| {
+        sender
+            .send(HostCommand::StatsRequest)
+            .map_err(|_| NetworkError::CommandSendError("HostCommand::StatsRequest".to_string()))
+    };
+
+    match node_type {
+        NodeType::Client => {
+            let sender = state
+                .client_controller_channels
+                .get(&node_id)
+                .map(|(s, _)| s)
+                .ok_or_else(|| NetworkError::NodeNotFound(node_id.to_string()))?;
+            send_stats_request(sender)
+        }
+        NodeType::Server => {
+            let sender = state
+                .server_controller_channels
+                .get(&node_id)
+                .map(|(s, _)| s)
+                .ok_or_else(|| NetworkError::NodeNotFound(node_id.to_string()))?;
+            send_stats_request(sender)
+        }
+        _ => Err(NetworkError::InvalidOperation(node_id.to_string())),
     }
 }
