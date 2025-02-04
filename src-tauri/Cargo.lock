@@ -648,8 +648,10 @@ checksum = "7e36cc9d416881d2e24f9a963be5fb1cd90966419ac844274161d10488b3e825"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
+ "js-sys",
  "num-traits",
  "serde",
+ "wasm-bindgen",
  "windows-targets 0.52.6",
 ]
 
@@ -3491,6 +3493,7 @@ checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
 name = "reactsc"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "client",
  "common-utils",
  "crossbeam-channel",
@@ -3506,11 +3509,13 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
+ "tauri-plugin-fs",
  "tauri-plugin-log",
  "tauri-plugin-opener",
  "thiserror 2.0.11",
  "toml 0.8.19",
  "tracing-subscriber",
+ "uuid",
  "wg_2024",
 ]
 

@@ -8,6 +8,34 @@
   "permissions": [
     "core:default",
     "opener:default",
-    "dialog:default"
+    "dialog:default",
+    "fs:default",
+    "fs:allow-read-text-file",
+    "fs:allow-resource-read-recursive",
+    {
+      "identifier": "fs:allow-read",
+      "allow": [
+        "$RESOURCE/default_configs/**",
+        "$APPDATA/history/**"
+      ]
+    },
+    {
+      "identifier": "fs:allow-write",
+      "allow": [
+        "$APPDATA/history/**"
+      ]
+    },
+    {
+      "identifier": "fs:allow-appdata-write",
+      "allow": [
+        "$APPDATA/history/**"
+      ]
+    },
+    {
+      "identifier": "fs:allow-appdata-write-recursive",
+      "allow": [
+        "$APPDATA/history/**"
+      ]
+    }
   ]
 }
