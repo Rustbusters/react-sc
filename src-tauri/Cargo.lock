@@ -662,6 +662,7 @@ checksum = "6e4de3bc4ea267985becf712dc6d9eed8b04c953b3fcfb339ebc87acd9804901"
 [[package]]
 name = "client"
 version = "0.1.0"
+source = "git+https://github.com/Rustbusters/client.git#9b3e45763813b1aab0671b0b095bbe2f205fb20f"
 dependencies = [
  "common-utils",
  "crossbeam-channel",
@@ -4061,6 +4062,7 @@ dependencies = [
 [[package]]
 name = "server"
 version = "0.1.0"
+source = "git+https://github.com/Rustbusters/server.git#e71b7e03933d5974a3d43c4563462241640c7a11"
 dependencies = [
  "common-utils",
  "crossbeam",

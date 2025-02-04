@@ -1,0 +1,229 @@
+import React, { useRef, useEffect, useState } from 'react';
+import PieChart from "../components/PieChart"
+import LineChart from "../components/LineChart"
+import BarChart from "../components/BarChart"
+import Title from '../components/common/Title';
+
+import { GlobalStateContext } from '../GlobalState';
+import axios from 'axios';
+import { HTTP_URL } from '../utils/constants';
+import { defaultStats, MessageType, ServerActiveUsers, StatsType, UserType } from '../utils/types';
+import ExpandableSection from '../components/ExpandableSection';
+
+type ServerProps = {
+    id: number,
+    stats: StatsType,
+    messages: MessageType[],
+    activeUsers: UserType[]
+};
+
+const Server: React.FC<ServerProps> = ({ id, stats, messages, activeUsers }) => {
+
+    // Open state
+    const [isChartOpen, setIsChartOpen] = useState(true);
+    const [isMessagesOpen, setIsMessagesOpen] = useState(messages.length > 0);
+    const [isActiveUsersOpen, setIsActiveUsersOpen] = useState(activeUsers.length > 0);
+
+    const getMessages = () => {
+        axios.get(`${HTTP_URL}/api/servers/messages/${id}`)
+            .catch(err => {
+                console.error("Error: ", err.message);
+            });
+    }
+
+    const getStats = () => {
+        axios.get(`${HTTP_URL}/api/servers/stats/${id}`)
+            .catch(err => {
+                console.error("Error: ", err.message);
+            });
+    }
+
+    const getActiveUsers = () => {
+        axios.get(`${HTTP_URL}/api/servers/users/${id}`)
+            .catch(err => {
+                console.error("Error: ", err.message);
+            });
+    }
+
+    useEffect(() => {
+        getMessages();
+        getStats();
+        getActiveUsers();
+    }, [window.location.pathname]);
+
+    return (
+        <div className="p-8 flex flex-1 bg-gray-50 overflow-y-scroll max-h-screen">
+            <div className="flex flex-col flex-1">
+                <main>
+                    <Title title={`Server ${id}`} label={`This screen displays the server's ${id} statistics on messages/fragments sent/received and the exchanged messages on the network.`} />
+
+                    <div className="w-full h-4"></div>
+                    <div className="w-full flex flex-col space-y-4 pb-16">
+                        <ExpandableSection title="Statistics" isOpen={isChartOpen} setIsOpen={setIsChartOpen}>
+                            {stats ? <div className="flex flex-col space-y-8">
+                                <PieChart stats={stats} />
+                                <BarChart stats={stats} />
+                            </div> : <div className="w-full h-full text-slate-500">
+                                No data to display</div>}
+                        </ExpandableSection>
+                        <ExpandableSection title="Messages" isOpen={isMessagesOpen} setIsOpen={setIsMessagesOpen}>
+                            <Table data={messages} columns={[
+                                { key: "id", label: "ID" },
+                                { key: "srcId", label: "Source ID", render: (value) => <span className="px-3 py-2 rounded-xl bg-indigo-500 text-white">{value}</span> },
+                                { key: "destId", label: "Destination ID", render: (value) => <span className="px-3 py-2 rounded-xl bg-blue-500 text-white">{value}</span> },
+                                { key: "message", label: "Message" }]} />
+                        </ExpandableSection>
+                        <ExpandableSection title="Active Users" isOpen={isActiveUsersOpen} setIsOpen={setIsActiveUsersOpen}>
+                            <Table data={activeUsers} columns={[
+                                { key: "id", label: "ID" },
+                                { key: "name", label: "Name", render: (value) => <span className="px-3 py-2 rounded-xl bg-indigo-500 text-white">{value}</span> },
+                            ]} rowsPerPage={3} />
+                        </ExpandableSection>
+                    </div>
+                </main>
+            </div>
+        </div>
+    );
+};
+
+// Generic type for table props
+type TableProps<T> = {
+    data: T[];
+    columns: { key: keyof T; label: string; render?: (value: any, row: T) => React.ReactNode }[];
+    rowsPerPage?: number;
+};
+
+const Table = <T,>({ data, columns, rowsPerPage = 5 }: TableProps<T>) => {
+    // State for pagination
+    const [paginatedData, setPaginatedData] = useState<T[]>([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+
+    useEffect(() => {
+        // Calculate pagination
+        const total = Math.ceil(data.length / rowsPerPage);
+        setTotalPages(total);
+        setPaginatedData(data.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage));
+    }, [data, currentPage, rowsPerPage]);
+
+    return (
+        <React.Fragment>
+            {data && data.length !== 0 ? <div className="flex flex-col">
+                <div className="-m-1.5 overflow-x-auto">
+                    <div className="p-1.5 min-w-full inline-block align-middle">
+                        <div className="overflow-hidden">
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+                                <thead>
+                                    <tr>
+                                        {columns.map((col) => (
+                                            <th key={String(col.key)} className="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">
+                                                {col.label}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody className="w-full h-[420px] divide-y divide-gray-200 dark:divide-neutral-700">
+                                    {paginatedData.map((item, index) => (
+                                        <tr key={index} className="h-[80px]">
+                                            {columns.map((col) => (
+                                                <td key={String(col.key)} className="px-6 py-4 w-[25vw] h-[80px] max-h-[80px] overflow-y-scroll text-sm text-gray-800 dark:text-neutral-200">
+                                                    {col.key != "message" ? (col.render ? col.render(item[col.key], item) : String(item[col.key])) :
+                                                        <ExpandableCell content={col.render ? col.render(item[col.key], item) : String(item[col.key])} />
+                                                    }
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                    <tr className='h-full'></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        {/* Pagination */}
+                        <div className="mt-4">
+                            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+                        </div>
+                    </div>
+                </div>
+            </div> : <div className="w-full h-full text-slate-500">No data to display</div>}
+        </React.Fragment>
+    );
+};
+
+const ExpandableCell = ({ content }: { content: any }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [isOverflowing, setIsOverflowing] = useState(false);
+    const contentRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (contentRef.current) {
+            setIsOverflowing(contentRef.current.scrollHeight > contentRef.current.clientHeight);
+        }
+    }, [content]);
+
+    return (
+        <div className="relative">
+            {/* Content Container */}
+            <div
+                ref={contentRef}
+                className={`overflow-hidden transition-all ${isExpanded ? "max-h-full" : "max-h-[4.5rem]"
+                    }`}
+                style={{ lineHeight: "1.5rem" }} // 3 lines max initially
+            >
+                {content}
+            </div>
+
+            {/* Show More / Show Less Button */}
+            {isOverflowing && (
+                <button
+                    className="text-blue-500 text-xs mt-1 underline"
+                    onClick={() => setIsExpanded(!isExpanded)}
+                >
+                    {isExpanded ? "Show Less" : "Show More"}
+                </button>
+            )}
+        </div>
+    );
+};
+
+// Pagination component for rendering everything on multiple pages
+type PaginationProps = {
+    currentPage: number;
+    totalPages: number;
+    onPageChange: (page: number) => void;
+}
+
+const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPageChange }) => {
+    const pages = Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    return (
+        <div className="flex items-center justify-center space-x-2">
+            <button
+                className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 disabled:opacity-50"
+                onClick={() => onPageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+            >
+                Prev
+            </button>
+
+            {pages.map((page) => (
+                <button
+                    key={page}
+                    className={`px-3 py-2 rounded-md ${currentPage === page ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                        }`}
+                    onClick={() => onPageChange(page)}
+                >
+                    {page}
+                </button>
+            ))}
+
+            <button
+                className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 disabled:opacity-50"
+                onClick={() => onPageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+            >
+                Next
+            </button>
+        </div>
+    );
+};
+export default Server;
