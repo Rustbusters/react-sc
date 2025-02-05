@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label.tsx";
@@ -19,6 +18,8 @@ interface HostStats {
 interface DroneStats {
   packets_sent: number;
   packets_dropped: number;
+  shortcuts_used: number;
+  packet_type_counts: Record<string, number>;
 }
 
 interface NodeDetailsProps {
@@ -35,59 +36,43 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
   const [newNeighbor, setNewNeighbor] = useState<string>("");
   const [copySuccess, setCopySuccess] = useState(false);
 
-  useEffect(() => {
-    const fetchNodeDetails = async () => {
-      try {
-        const response = await invoke<{
-          node_id: string;
-          type: "Drone" | "Client" | "Server";
-          connections: string[];
-          pdr?: number;
-          packets_sent?: number;
-          packets_dropped?: number;
-        }>("get_node_info", { nodeId: Number(nodeId) });
+  const fetchNodeDetails = async () => {
+    try {
+      const response = await invoke<{
+        node_id: string;
+        type: "Drone" | "Client" | "Server";
+        connections: string[];
+        pdr?: number;
+        packets_sent?: number;
+        packets_dropped?: number;
+        shortcuts_used?: number;
+        packet_type_counts?: Record<string, number>;
+      }>("get_node_info", { nodeId: Number(nodeId) });
 
-        setNodeType(response.type);
-        setNeighbors(response.connections.sort((a, b) => Number(a) - Number(b)));
+      setNodeType(response.type);
+      setNeighbors(response.connections.sort((a, b) => Number(a) - Number(b)));
 
-        if (response.type === "Drone") {
-          setPdr(response.pdr !== undefined ? Number(response.pdr.toFixed(2)) : null);
-          setStats({
-            packets_sent: response.packets_sent ?? 0, // TODO: aggiungerlo anche per gli host, poiché è un parametro calcolato dal SC
-            packets_dropped: response.packets_dropped ?? 0,
-          });
-        }
-
-        if (response.type === "Client" || response.type === "Server") {
-          await invoke("get_host_stats", { nodeId: Number(nodeId) });
-        }
-      } catch (error) {
-        console.error("Errore nel recupero dei dettagli:", error);
+      if (response.type === "Drone") {
+        setPdr(response.pdr ?? null);
+        setStats({
+          packets_sent: response.packets_sent ?? 0,
+          packets_dropped: response.packets_dropped ?? 0,
+          shortcuts_used: response.shortcuts_used ?? 0,
+          packet_type_counts: response.packet_type_counts ?? {},
+        });
+      } else {
+        const hostStats = await invoke<HostStats>("get_host_stats", { nodeId: Number(nodeId) });
+        setStats(hostStats);
       }
-    };
+    } catch (error) {
+      console.error("Errore nel recupero dei dettagli:", error);
+    }
+  };
 
+  useEffect(() => {
     fetchNodeDetails();
-  }, [nodeId]);
-
-  useEffect(() => {
-    const unlistenPromise = listen<[number, HostStats]>(
-      "host_stats",
-      (event) => {
-        console.log("Statistiche aggiornate:", event.payload);
-        const [receivedNodeId, hostStats] = event.payload;
-
-        if (receivedNodeId === Number(nodeId)) {
-          setStats((prev) => ({
-            ...prev,
-            ...hostStats,
-          }));
-        }
-      }
-    );
-
-    return () => {
-      unlistenPromise.then((unlisten) => unlisten());
-    };
+    const interval = setInterval(fetchNodeDetails, 5000); // Aggiorna ogni 5 secondi
+    return () => clearInterval(interval);
   }, [nodeId]);
 
   // Aggiunta di un vicino

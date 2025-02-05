@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { invoke } from "@tauri-apps/api/core";
 import { LaptopIcon, ServerIcon } from "lucide-react";
-import { PiDrone } from "react-icons/pi"; // Corretto LaptopIcon
+import { PiDrone } from "react-icons/pi"; // Icona per i droni
 
 interface NodeInfo {
   node_id: number;
@@ -10,6 +10,8 @@ interface NodeInfo {
   pdr?: number;
   packets_sent?: number;
   packets_dropped?: number;
+  shortcuts_used?: number;
+  packet_type_counts?: Record<string, number>;
   connections: number[];
 }
 
@@ -33,7 +35,7 @@ const NetworkInfos = () => {
 
   useEffect(() => {
     fetchNetworkInfos();
-    const interval = setInterval(fetchNetworkInfos, 2000);
+    const interval = setInterval(fetchNetworkInfos, 5000); // Aggiornamento ogni 5 secondi
     return () => clearInterval(interval);
   }, []);
 
@@ -52,6 +54,8 @@ const NetworkInfos = () => {
             <TableHead>Connections</TableHead>
             <TableHead>Packets Sent</TableHead>
             <TableHead>Packets Dropped</TableHead>
+            <TableHead>Shortcuts Used</TableHead>
+            <TableHead>Packet Types</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -60,20 +64,31 @@ const NetworkInfos = () => {
               <TableRow key={ node.node_id } className="hover:bg-gray-100">
                 <TableCell className="font-medium">{ node.node_id }</TableCell>
                 <TableCell className="flex items-center gap-2">
-                  { node.type === "Drone" && <PiDrone className="w-5 h-5  text-[#9ACDC8]" strokeWidth={ 2.5 }/> }
-                  { node.type === "Server" && <ServerIcon className="w-5 h-5  text-[#EDCB95]" strokeWidth={ 2.5 }/> }
-                  { node.type === "Client" && <LaptopIcon className="w-5 h-5  text-[#C3D59D]" strokeWidth={ 2.5 }/> }
-                  {/*<span>{ node.type }</span>*/ }
+                  { node.type === "Drone" && <PiDrone className="w-5 h-5 text-[#9ACDC8]" strokeWidth={ 2.5 }/> }
+                  { node.type === "Server" && <ServerIcon className="w-5 h-5 text-[#EDCB95]" strokeWidth={ 2.5 }/> }
+                  { node.type === "Client" && <LaptopIcon className="w-5 h-5 text-[#C3D59D]" strokeWidth={ 2.5 }/> }
                 </TableCell>
                 <TableCell>{ node.pdr !== undefined ? node.pdr.toFixed(2) : "-" }</TableCell>
                 <TableCell>{ node.connections.length > 0 ? node.connections.join(", ") : "-" }</TableCell>
                 <TableCell>{ node.packets_sent ?? "-" }</TableCell>
                 <TableCell>{ node.packets_dropped ?? "-" }</TableCell>
+                <TableCell>{ node.shortcuts_used ?? "-" }</TableCell>
+                <TableCell>
+                  { node.packet_type_counts
+                    ? Object.entries(node.packet_type_counts).map(([type, count]) => (
+                      <div key={ type } className="text-xs">
+                        { type }: <span className="font-semibold">{ count }</span>
+                      </div>
+                    ))
+                    : "-" }
+                </TableCell>
               </TableRow>
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={ 6 } className="text-center">Nessun dato disponibile</TableCell>
+              <TableCell colSpan={ 8 } className="text-center">
+                Nessun dato disponibile
+              </TableCell>
             </TableRow>
           ) }
         </TableBody>

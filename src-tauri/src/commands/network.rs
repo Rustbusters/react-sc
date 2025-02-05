@@ -96,7 +96,8 @@ pub fn stop_network(
     net_state.drones_controller_channels.clear();
     net_state.client_controller_channels.clear();
     net_state.server_controller_channels.clear();
-    net_state.node_stats.clear();
+    net_state.node_threads.clear();
+    net_state.metrics = Default::default();
     net_state.graph = GraphState::default();
 
     net_state.set_status(NetworkStatus::Stopped);
