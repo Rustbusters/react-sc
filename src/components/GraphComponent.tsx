@@ -15,6 +15,30 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
   const [cy, setCy] = useState<cytoscape.Core | null>(null);
   const { status } = useSimulation();
 
+  const saveGraphLayout = () => {
+    if (!cy) return;
+    const positions = cy.nodes().map((node) => ({
+      id: node.id(),
+      position: node.position(),
+    }));
+    sessionStorage.setItem("graph_layout", JSON.stringify(positions));
+  };
+
+  const isGraphDifferent = (newElements: any[]) => {
+    if (!cy) return true;
+    const currentElements = cy.elements().jsons();
+    console.log("Current elements:", currentElements);
+    console.log("New elements:", newElements);
+    console.log("Diff:", JSON.stringify(currentElements) !== JSON.stringify(newElements));
+    return JSON.stringify(currentElements) !== JSON.stringify(newElements);
+  };
+
+  const removeGraphElement = (id: string, type: "node" | "edge") => {
+    if (!cy) return;
+    const element = type === "node" ? cy.$(`#${ id }`) : cy.$(`edge[source="${ id }"], edge[target="${ id }"]`);
+    element.remove();
+  };
+
   const loadGraphData = useCallback(async () => {
     try {
       const response = await invoke<{
@@ -25,12 +49,7 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
 
       if (!cy) return;
 
-      cy.elements().remove();
-
-      const elements: (
-        | cytoscape.ElementDefinition
-        | cytoscape.EdgeDefinition
-        )[] = [];
+      const elements: (cytoscape.ElementDefinition | cytoscape.EdgeDefinition)[] = [];
 
       // Aggiunta dei nodi
       response.drones.forEach((drone) => {
@@ -82,16 +101,24 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
         });
       });
 
-      cy.add(elements);
-      cy.layout({ name: "cose" }).run();
+      // Confronta il grafo attuale con il nuovo per evitare reload inutili
+      if (isGraphDifferent(elements)) {
+        cy.elements().remove();
+        cy.add(elements);
+
+        // Ripristina la disposizione salvata dei nodi
+        const savedLayout = sessionStorage.getItem("graph_layout");
+        if (savedLayout) {
+          const positions = JSON.parse(savedLayout);
+          positions.forEach((node: any) => {
+            cy.$(`#${ node.id }`).position(node.position);
+          });
+        }
+
+        cy.layout({ name: "cose" }).run();
+      }
     } catch (error) {
       console.error("Failed to load graph data:", error);
-
-      if (error === "No configuration loaded") {
-        alert(
-          "Configurazione non caricata. Carica una configurazione prima di visualizzare il grafo."
-        );
-      }
     }
   }, [cy]);
 
@@ -186,15 +213,23 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
 
     setCy(cyInstance);
 
+    const savedLayout = sessionStorage.getItem("graph_layout");
+    if (savedLayout) {
+      const positions = JSON.parse(savedLayout);
+      positions.forEach((node: any) => {
+        cyInstance.$(`#${ node.id }`).position(node.position);
+      });
+    }
+
     return () => {
+      saveGraphLayout();
       cyInstance.destroy();
     };
   }, []);
 
+  // Update of the graph layout when the window is resized
   useEffect(() => {
     if (!cy) return;
-
-    // Aggiorna layout quando la finestra viene ridimensionata
     const resizeObserver = new ResizeObserver(() => {
       cy.resize();
       cy.fit();
@@ -209,6 +244,7 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
     };
   }, [cy]);
 
+  // Remove selected nodes and edges when the backspace key is pressed
   useEffect(() => {
     if (!cy || status === "Running") return;
 
@@ -224,6 +260,7 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
           const nodeId = node.id();
           console.log(`Removing node: ${ nodeId }`);
           await invoke("config_remove_node", { nodeId: Number(nodeId) });
+          removeGraphElement(nodeId, "node");
         }
         selectedNodes.unselect();
       }
@@ -234,6 +271,7 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
           const target = edge.target().id();
           console.log(`Removing edge: ${ source } - ${ target }`);
           await invoke("config_remove_edge", { node1Id: Number(source), node2Id: Number(target) });
+          removeGraphElement(edge.id(), "edge");
         }
         selectedEdges.unselect();
       }
@@ -301,7 +339,10 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
     <div className="relative flex flex-col h-full w-full min-w-0 overflow-hidden">
       {/* Bottone posizionato in alto a destra */ }
       <Button
-        onClick={ loadGraphData }
+        onClick={ () => {
+          saveGraphLayout();
+          loadGraphData();
+        } }
         className="absolute top-4 right-4 z-10 p-2 aspect-square bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none"
       >
         <RefreshCcw className="w-5 h-5"/>

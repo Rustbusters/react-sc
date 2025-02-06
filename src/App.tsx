@@ -12,7 +12,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={ <Home/> }/>
-      <Route path="/inbox" element={ <Logs/> }/>
+      <Route path="/logs" element={ <Logs/> }/>
       <Route path="/send" element={ <SendPacketForm/> }/>
       <Route path="/stats" element={ <NetworkStatsPage/> }/>
       <Route path="/simulation" element={ <Simulation/> }/>

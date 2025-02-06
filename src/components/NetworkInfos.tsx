@@ -24,7 +24,6 @@ const NetworkInfos = () => {
   const fetchNetworkInfos = async () => {
     try {
       const response = await invoke<{ nodes: NodeInfo[] }>("get_network_infos");
-      console.log(response);
       setNetworkData(response.nodes);
     } catch (err) {
       setError("Error fetching network infos");

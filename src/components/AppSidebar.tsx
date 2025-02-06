@@ -9,12 +9,12 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { ChartLine, Inbox, Play, Search, Send, Settings } from "lucide-react";
+import { ChartLine, Logs, Play, Search, Send, Settings } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
 const items = [
   { title: "Simulazione", url: "/simulation", icon: Play },
-  { title: "Inbox", url: "/inbox", icon: Inbox },
+  { title: "Logs", url: "/logs", icon: Logs },
   { title: "Stats", url: "/stats", icon: ChartLine },
   { title: "Send", url: "/send", icon: Send },
   { title: "Search", url: "#", icon: Search },

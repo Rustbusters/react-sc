@@ -51,6 +51,11 @@ const Settings = () => {
       return;
     }
 
+    if (status === "Running") {
+      toast.error("Simulation is running, please stop it before loading a new configuration.");
+      return;
+    }
+
     try {
       await invoke("load_config", { path });
       setConfigPath(path);
