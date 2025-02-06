@@ -1,16 +1,7 @@
+use crate::error::NetworkError;
 use crate::network::state::GraphState;
 use log::debug;
 use std::collections::HashSet;
-/*
-Checks that should be performed on the network graph:
-- The graph is connected
-- The graph is bidirectional
-- Clients have 1-2 connections to drones
-- Servers have at least 2 connections to drones
-- No duplicate node IDs
-- Clients and servers are at the edges of the network: if all clients and servers are removed, the remaining graph is disconnected
-- Clients and servers cannot have direct connections to other clients or servers
-*/
 
 /// Validates the network graph according to the specified constraints.
 /// Ensures the graph is connected, bidirectional, has valid client/server connections,
@@ -21,26 +12,25 @@ Checks that should be performed on the network graph:
 ///
 /// # Returns
 /// - `Ok(())` if the graph is valid.
-/// - `Err(String)` with an error message if the graph is invalid.
-pub fn validate_graph(graph: &GraphState) -> Result<(), String> {
+/// - `Err(NetworkError::ValidationError)` if the graph is invalid.
+pub fn validate_graph(graph: &GraphState) -> Result<(), NetworkError> {
     validate_connected_graph(graph)?;
     validate_bidirectionality(graph)?;
     validate_clients_and_servers(graph)?;
     validate_no_duplicate_ids(graph)?;
-    validate_edge_nodes(graph)?;
+    validate_no_host_direct_connections(graph)?;
+    validate_network_connected_without_hosts(graph)?;
     Ok(())
 }
 
 /// Ensures the graph is connected. A graph is connected if there is a path between any two nodes.
-///
-/// # Parameters
-/// - `graph`: The network graph represented as a `GraphState`.
-///
-/// # Returns
-/// - `Ok(())` if the graph is connected.
-/// - `Err(String)` if the graph is disconnected.
-fn validate_connected_graph(graph: &GraphState) -> Result<(), String> {
-    let start_node = graph.adjacency.keys().next().ok_or("Graph is empty")?;
+fn validate_connected_graph(graph: &GraphState) -> Result<(), NetworkError> {
+    let start_node = graph
+        .adjacency
+        .keys()
+        .next()
+        .ok_or_else(|| NetworkError::ValidationError("The graph is empty.".to_string()))?;
+
     let mut visited = HashSet::new();
     let mut stack = vec![*start_node];
 
@@ -56,19 +46,14 @@ fn validate_connected_graph(graph: &GraphState) -> Result<(), String> {
     if visited.len() == graph.adjacency.len() {
         Ok(())
     } else {
-        Err("Graph is not connected".to_string())
+        Err(NetworkError::ValidationError(
+            "The graph is not fully connected.".to_string(),
+        ))
     }
 }
 
 /// Ensures the graph is bidirectional. For every edge A -> B, there must be a corresponding edge B -> A.
-///
-/// # Parameters
-/// - `graph`: The network graph represented as a `GraphState`.
-///
-/// # Returns
-/// - `Ok(())` if the graph is bidirectional.
-/// - `Err(String)` if any edge is missing its reverse counterpart.
-fn validate_bidirectionality(graph: &GraphState) -> Result<(), String> {
+fn validate_bidirectionality(graph: &GraphState) -> Result<(), NetworkError> {
     for (node, neighbors) in &graph.adjacency {
         for &neighbor in neighbors {
             if !graph
@@ -76,10 +61,10 @@ fn validate_bidirectionality(graph: &GraphState) -> Result<(), String> {
                 .get(&neighbor)
                 .map_or(false, |n| n.contains(node))
             {
-                return Err(format!(
-                    "Graph is not bidirectional: {} -> {}",
+                return Err(NetworkError::ValidationError(format!(
+                    "The graph is not bidirectional: {} -> {} exists, but not vice versa.",
                     node, neighbor
-                ));
+                )));
             }
         }
     }
@@ -88,37 +73,45 @@ fn validate_bidirectionality(graph: &GraphState) -> Result<(), String> {
 
 /// Validates the connections of clients and servers. Clients must have 1-2 connections to drones,
 /// and servers must have at least 2 connections to drones.
-///
-/// # Parameters
-/// - `graph`: The network graph represented as a `GraphState`.
-///
-/// # Returns
-/// - `Ok(())` if all clients and servers have valid connections.
-/// - `Err(String)` if any client or server has invalid connections.
-fn validate_clients_and_servers(graph: &GraphState) -> Result<(), String> {
+fn validate_clients_and_servers(graph: &GraphState) -> Result<(), NetworkError> {
     for (node, meta) in &graph.node_info {
         match meta.node_type {
             crate::network::state::NodeType::Client => {
                 debug!("Validating client {}", node);
-                let neighbors = graph.adjacency.get(node).ok_or("Client has no neighbors")?;
+                let neighbors = graph.adjacency.get(node).ok_or_else(|| {
+                    NetworkError::ValidationError(format!(
+                        "Client {} has no valid connections.",
+                        node
+                    ))
+                })?;
+
                 if neighbors.is_empty() || neighbors.len() > 2 {
                     debug!(
-                        "Client {} has {} neighbors: {:?}",
+                        "Client {} has {} connections: {:?}",
                         node,
                         neighbors.len(),
                         neighbors
                     );
-                    return Err(format!("Client {} must have 1-2 drone connections", node));
+                    return Err(NetworkError::ValidationError(format!(
+                        "Client {} must have 1 or 2 connections to drones.",
+                        node
+                    )));
                 }
             }
             crate::network::state::NodeType::Server => {
                 debug!("Validating server {}", node);
-                let neighbors = graph.adjacency.get(node).ok_or("Server has no neighbors")?;
-                if neighbors.len() < 2 {
-                    return Err(format!(
-                        "Server {} must have at least 2 drone connections",
+                let neighbors = graph.adjacency.get(node).ok_or_else(|| {
+                    NetworkError::ValidationError(format!(
+                        "Server {} has no valid connections.",
                         node
-                    ));
+                    ))
+                })?;
+
+                if neighbors.len() < 2 {
+                    return Err(NetworkError::ValidationError(format!(
+                        "Server {} must have at least 2 connections to drones.",
+                        node
+                    )));
                 }
             }
             _ => {}
@@ -128,18 +121,14 @@ fn validate_clients_and_servers(graph: &GraphState) -> Result<(), String> {
 }
 
 /// Ensures there are no duplicate node IDs in the graph.
-///
-/// # Parameters
-/// - `graph`: The network graph represented as a `GraphState`.
-///
-/// # Returns
-/// - `Ok(())` if no duplicate IDs are found.
-/// - `Err(String)` if duplicate IDs are detected.
-fn validate_no_duplicate_ids(graph: &GraphState) -> Result<(), String> {
+fn validate_no_duplicate_ids(graph: &GraphState) -> Result<(), NetworkError> {
     let mut seen = HashSet::new();
     for node in graph.adjacency.keys() {
         if !seen.insert(node) {
-            return Err(format!("Duplicate node ID detected: {}", node));
+            return Err(NetworkError::ValidationError(format!(
+                "Duplicate node ID found in the graph: {}",
+                node
+            )));
         }
     }
     Ok(())
@@ -147,14 +136,7 @@ fn validate_no_duplicate_ids(graph: &GraphState) -> Result<(), String> {
 
 /// Ensures that clients and servers are at the edges of the network.
 /// Clients and servers cannot have direct connections to other clients or servers.
-///
-/// # Parameters
-/// - `graph`: The network graph represented as a `GraphState`.
-///
-/// # Returns
-/// - `Ok(())` if all clients and servers are at the network edges.
-/// - `Err(String)` if any client or server is not at the edge.
-fn validate_edge_nodes(graph: &GraphState) -> Result<(), String> {
+fn validate_no_host_direct_connections(graph: &GraphState) -> Result<(), NetworkError> {
     for (node, meta) in &graph.node_info {
         match &meta.node_type {
             crate::network::state::NodeType::Client | crate::network::state::NodeType::Server => {
@@ -167,10 +149,10 @@ fn validate_edge_nodes(graph: &GraphState) -> Result<(), String> {
                                     | crate::network::state::NodeType::Server
                             )
                         ) {
-                            return Err(format!(
-                                "Client/Server {} is not at the edge of the network",
-                                node
-                            ));
+                            return Err(NetworkError::ValidationError(format!(
+                                "Node {} (Client/Server) is directly connected to another Client/Server {}. Clients and Servers must be at the edges of the network.",
+                                node, neighbor
+                            )));
                         }
                     }
                 }
@@ -179,4 +161,56 @@ fn validate_edge_nodes(graph: &GraphState) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// Ensures that the network remains connected when clients and servers are removed.
+fn validate_network_connected_without_hosts(graph: &GraphState) -> Result<(), NetworkError> {
+    // Find any drone node to start BFS
+    let start_node = graph
+        .node_info
+        .iter()
+        .find(|(_, meta)| matches!(meta.node_type, crate::network::state::NodeType::Drone))
+        .map(|(&id, _)| id);
+
+    if start_node.is_none() {
+        return Err(NetworkError::ValidationError(
+            "No drones found in the network. The core network must contain at least one drone."
+                .to_string(),
+        ));
+    }
+    let start_node = start_node.unwrap();
+
+    // Perform BFS
+    let mut visited = HashSet::new();
+    let mut queue = vec![start_node];
+
+    while let Some(node) = queue.pop() {
+        if !visited.insert(node) {
+            continue;
+        }
+        if let Some(neighbors) = graph.adjacency.get(&node) {
+            for &neighbor in neighbors {
+                // Ignore hosts (clients and servers)
+                if matches!(graph.node_info.get(&neighbor), Some(m) if matches!(m.node_type, crate::network::state::NodeType::Drone))
+                {
+                    queue.push(neighbor);
+                }
+            }
+        }
+    }
+
+    // Check if all drones were visited
+    let drone_count = graph
+        .node_info
+        .values()
+        .filter(|meta| matches!(meta.node_type, crate::network::state::NodeType::Drone))
+        .count();
+
+    if visited.len() == drone_count {
+        Ok(())
+    } else {
+        Err(NetworkError::ValidationError(
+            "The network is disconnected when clients and servers are removed. The drone network must remain connected.".to_string(),
+        ))
+    }
 }

@@ -8,11 +8,10 @@ use tauri::State as TauriState;
 use tauri::{AppHandle, Emitter};
 use wg_2024::controller::DroneCommand;
 
-/// Starts the network by calling `initialize_network` on the `NetworkState`.
-/// Fails if `node_threads` is not empty (network already running).
+/// Starts the network by initializing the network state and starting all nodes.
 #[tauri::command]
 pub fn start_network(
-    app: tauri::AppHandle,
+    app: AppHandle,
     state: TauriState<Arc<Mutex<NetworkState>>>,
 ) -> Result<(), NetworkError> {
     let mut net_state = state.lock();
@@ -24,6 +23,11 @@ pub fn start_network(
     }
 
     net_state.initialize_network()?;
+
+    if let Err(err) = net_state.save_config_to_history(app.clone()) {
+        error!("Failed to save configuration to history: {}", err);
+    }
+
     app.emit("network_status_changed", NetworkStatus::Running)
         .unwrap();
     info!("Network started successfully");
@@ -40,9 +44,9 @@ pub fn get_network_status(state: TauriState<Arc<Mutex<NetworkState>>>) -> Networ
 /// then joining and clearing all threads.
 #[tauri::command]
 pub fn stop_network(
-    app: tauri::AppHandle,
+    app: AppHandle,
     state: TauriState<Arc<Mutex<NetworkState>>>,
-) -> Result<(), String> {
+) -> Result<(), NetworkError> {
     let mut net_state = state.lock();
 
     if net_state.get_status() != NetworkStatus::Running {
@@ -52,35 +56,39 @@ pub fn stop_network(
 
     info!("Stopping the network...");
 
-    // 🔹 Invia il comando "Crash" a tutti i droni
-    // TODO: fix crash command
+    // Drones
     for (drone_id, (sender, _receiver)) in &net_state.drones_controller_channels {
-        if sender.send(DroneCommand::Crash).is_err() {
-            error!("Failed to send 'Crash' command to drone {}", drone_id);
-        } else {
-            info!("Sent 'Crash' command to drone {}", drone_id);
-        }
+        sender.send(DroneCommand::Crash).map_err(|_| {
+            NetworkError::CommandSendError(format!(
+                "Failed to send 'Crash' command to drone {}",
+                drone_id
+            ))
+        })?;
+        info!("Sent 'Crash' command to drone {}", drone_id);
     }
 
-    // 🔹 Invia il comando "Stop" a tutti i client
+    // Clients
     for (client_id, (sender, _receiver)) in &net_state.client_controller_channels {
-        if sender.send(HostCommand::Stop).is_err() {
-            error!("Failed to send 'Stop' command to client {}", client_id);
-        } else {
-            info!("Sent 'Stop' command to client {}", client_id);
-        }
+        sender.send(HostCommand::Stop).map_err(|_| {
+            NetworkError::CommandSendError(format!(
+                "Failed to send 'Stop' command to client {}",
+                client_id
+            ))
+        })?;
+        info!("Sent 'Stop' command to client {}", client_id);
     }
 
-    // 🔹 Invia il comando "Stop" a tutti i server
+    // Servers
     for (server_id, (sender, _receiver)) in &net_state.server_controller_channels {
-        if sender.send(HostCommand::Stop).is_err() {
-            error!("Failed to send 'Stop' command to server {}", server_id);
-        } else {
-            info!("Sent 'Stop' command to server {}", server_id);
-        }
+        sender.send(HostCommand::Stop).map_err(|_| {
+            NetworkError::CommandSendError(format!(
+                "Failed to send 'Stop' command to server {}",
+                server_id
+            ))
+        })?;
+        info!("Sent 'Stop' command to server {}", server_id);
     }
 
-    // 🔹 Join dei thread dei nodi dopo aver mandato i comandi
     for (node_id, handle) in net_state.node_threads.drain() {
         info!("Attempting to join thread for node {}", node_id);
         if let Err(e) = handle.join() {
@@ -93,19 +101,17 @@ pub fn stop_network(
         }
     }
 
-    net_state.inter_node_channels.clear();
-    net_state.drones_controller_channels.clear();
-    net_state.client_controller_channels.clear();
-    net_state.server_controller_channels.clear();
-    net_state.node_threads.clear();
-    net_state.metrics = Default::default();
-    net_state.graph = GraphState::default();
+    net_state.clear_simulation();
 
     net_state.set_status(NetworkStatus::Stopped);
 
-    // 🔹 Notifica il frontend che la rete è stata stoppata
     app.emit("network_status_changed", NetworkStatus::Stopped)
-        .unwrap_or_else(|err| error!("Failed to emit network status change: {:?}", err));
+        .map_err(|err| {
+            NetworkError::CommandSendError(format!(
+                "Failed to emit network status change: {:?}",
+                err
+            ))
+        })?;
 
     info!("Network stopped successfully");
     Ok(())

@@ -1,11 +1,11 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { toast } from "react-hot-toast";
 
-// Definiamo i possibili stati della rete
+// Possible network states
 type NetworkStatus = "Init" | "Running" | "Stopped";
 
-// Creiamo il contesto con un valore di default
 const SimulationContext = createContext<{
   status: NetworkStatus;
   isLoading: boolean;
@@ -23,23 +23,21 @@ const SimulationContext = createContext<{
   },
 });
 
-// Hook per accedere facilmente al contesto
+// Custom hook to access the simulation context
 export const useSimulation = () => useContext(SimulationContext);
 
-// Provider che gestisce lo stato centralizzato
 export const SimulationProvider = ({ children }: { children: React.ReactNode }) => {
   const [status, setStatus] = useState<NetworkStatus>("Init");
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Recuperiamo lo stato della rete dal backend all'avvio
   useEffect(() => {
     const fetchStatus = async () => {
       try {
+        setIsLoading(true);
         const response = await invoke<NetworkStatus>("get_network_status");
-        console.log(`Stato iniziale della rete: ${ response }`);
         setStatus(response);
       } catch (error) {
-        console.error("Errore nel recupero dello stato della rete:", error);
+        console.error("Error retrieving network status:", error);
       } finally {
         setIsLoading(false);
       }
@@ -50,7 +48,7 @@ export const SimulationProvider = ({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     const unlistenPromise = listen<string>("network_status_changed", (event) => {
-      console.log(`Stato della rete aggiornato: ${ event.payload }`);
+      console.log(`Network status updated: ${ event.payload }`);
       setStatus(event.payload as NetworkStatus);
     });
 
@@ -59,22 +57,21 @@ export const SimulationProvider = ({ children }: { children: React.ReactNode }) 
     };
   }, []);
 
-  // Funzioni per avviare/fermare la rete
   const startNetwork = async () => {
     try {
       await invoke("start_network");
-      setStatus("Running");
+      toast.success("Simulation started! Configuration saved to history.");
     } catch (error) {
-      console.error("Errore nell'avvio della rete:", error);
+      console.error("Error starting the network:", error);
+      toast.error("Failed to start simulation.");
     }
   };
 
   const stopNetwork = async () => {
     try {
       await invoke("stop_network");
-      setStatus("Stopped");
     } catch (error) {
-      console.error("Errore nell'arresto della rete:", error);
+      console.error("Error stopping the network:", error);
     }
   };
 
@@ -82,14 +79,21 @@ export const SimulationProvider = ({ children }: { children: React.ReactNode }) 
     try {
       await invoke("stop_network");
       await invoke("start_network");
-      setStatus("Running");
     } catch (error) {
-      console.error("Errore nel riavvio della rete:", error);
+      console.error("Error restarting the network:", error);
     }
   };
 
   return (
-    <SimulationContext.Provider value={ { status, isLoading, startNetwork, stopNetwork, restartNetwork } }>
+    <SimulationContext.Provider
+      value={ {
+        status,
+        isLoading,
+        startNetwork,
+        stopNetwork,
+        restartNetwork,
+      } }
+    >
       { children }
     </SimulationContext.Provider>
   );

@@ -1,19 +1,23 @@
+use crate::commands::get_history_dir;
 use crate::error::NetworkError;
+use crate::network::configs::SerializableConfig;
 use crate::network::metrics::Metrics;
 use crate::network::network_node::{initialize_clients, initialize_drones, initialize_servers};
 use crate::network::validation::validate_graph;
 use crate::utils::ControllerEvent;
+use chrono::Utc;
 use common_utils::{HostCommand, HostEvent};
 use crossbeam_channel::{Receiver, Sender};
 use log::{debug, error, info, trace};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
+use std::fs;
 use std::thread::JoinHandle;
-use std::time::{SystemTime, UNIX_EPOCH};
-use wg_2024::config::{Config, Drone, Server};
+use tauri::AppHandle;
+use wg_2024::config::{Config, Drone};
 use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::network::NodeId;
-use wg_2024::packet::{Ack, FloodRequest, Fragment, Nack, Packet};
+use wg_2024::packet::Packet;
 
 /// Holds adjacency information (custom graph) and per-node metadata.
 #[derive(Debug, Default)]
@@ -101,6 +105,17 @@ impl NetworkState {
         }
     }
 
+    pub fn clear_simulation(&mut self) {
+        self.graph = GraphState::default();
+        self.node_threads.clear();
+        self.inter_node_channels.clear();
+        self.drones_controller_channels.clear();
+        self.client_controller_channels.clear();
+        self.server_controller_channels.clear();
+        self.metrics = Metrics::default();
+        self.received_messages.clear();
+    }
+
     // --------------------------------------------------------------------------
     // Convenience getters
     // --------------------------------------------------------------------------
@@ -178,16 +193,34 @@ impl NetworkState {
     /// This config remains static and will NOT be updated after initialization.
     pub fn load_config(&mut self, config: Config) -> Result<(), NetworkError> {
         // Clear existing runtime state
-        self.node_threads.clear();
-        self.inter_node_channels.clear();
-        self.drones_controller_channels.clear();
-        self.client_controller_channels.clear();
-        self.server_controller_channels.clear();
-        self.metrics = Metrics::default();
-        self.graph = GraphState::default();
+        self.clear_simulation();
 
         // Store the newly loaded config
         self.initial_config = Some(config);
+
+        Ok(())
+    }
+
+    pub fn save_config_to_history(&self, app_handle: AppHandle) -> Result<(), String> {
+        let history_dir = get_history_dir(app_handle)?;
+        let timestamp = Utc::now().format("%Y%m%d%H%M%S");
+
+        // Convert `Config` into `SerializableConfig`
+        let config = self
+            .initial_config
+            .as_ref()
+            .ok_or("No configuration loaded")?;
+        let serializable_config = SerializableConfig::from(config);
+
+        // Serialize to TOML
+        let toml_data = toml::to_string(&serializable_config).map_err(|e| e.to_string())?;
+
+        // Generate a filename
+        let file_name = format!("config_{}.toml", timestamp);
+        let file_path = history_dir.join(file_name);
+
+        // Save to file
+        fs::write(&file_path, toml_data).map_err(|e| e.to_string())?;
 
         Ok(())
     }
@@ -198,7 +231,6 @@ impl NetworkState {
     /// Initializes the network based on the static config.
     /// Builds the custom graph, spawns threads, etc.
     pub fn initialize_network(&mut self) -> Result<(), NetworkError> {
-        // Clone the config so we don't hold an immutable borrow of `self`
         let local_config = match self.initial_config.clone() {
             Some(c) => c,
             None => return Err(NetworkError::NoConfigLoaded),
@@ -206,23 +238,15 @@ impl NetworkState {
 
         debug!("Initializing network with config: {:?}", local_config);
 
-        // Clear leftover structures
-        self.node_threads.clear();
-        self.inter_node_channels.clear();
-        self.drones_controller_channels.clear();
-        self.client_controller_channels.clear();
-        self.server_controller_channels.clear();
-        self.metrics = Metrics::default();
-        self.graph = GraphState::default();
+        self.clear_simulation();
 
-        // Build the custom graph from the cloned config
         self.build_graph(&local_config);
 
         debug!("Graph built successfully");
         trace!("Adjacency: {:?}", self.graph.adjacency);
 
         // Validate the graph
-        validate_graph(&self.graph).map_err(NetworkError::ValidationError)?;
+        validate_graph(&self.graph)?;
 
         debug!("Graph validated successfully");
 
@@ -246,7 +270,7 @@ impl NetworkState {
             self.metrics.insert_node(server.id, NodeType::Server);
         }
 
-        self.status = NetworkStatus::Running;
+        self.set_status(NetworkStatus::Running);
         // Finally, spawn node threads
         initialize_drones(self)?;
         initialize_clients(self)?;
@@ -256,7 +280,6 @@ impl NetworkState {
     }
 
     /// Builds the adjacency list and node_info from a `Config` reference.
-    /// This does NOT mutate `initial_config`; it only populates `self.graph`.
     fn build_graph(&mut self, cfg: &Config) {
         // 1) Insert drones
         for drone in &cfg.drone {

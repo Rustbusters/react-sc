@@ -1,17 +1,16 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "react-hot-toast";
 import { join } from "@tauri-apps/api/path";
 import { exists, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { File, FolderOpen, Trash, Upload } from "lucide-react";
+import { useSimulation } from "@/components/SimulationContext";
+import { Input } from "@/components/ui/input.tsx";
 
-// 📌 Costanti delle cartelle
 const LAST_CONFIG_FILE = "last_config.txt";
 
-// 📌 Definizione del tipo ConfigFile
 interface ConfigFile {
   id: string;
   name: string;
@@ -20,60 +19,50 @@ interface ConfigFile {
 }
 
 const Settings = () => {
-  const [configPath, setConfigPath] = useState<string>("");
+  const { status } = useSimulation();
   const [defaultConfigs, setDefaultConfigs] = useState<ConfigFile[]>([]);
   const [historyConfigs, setHistoryConfigs] = useState<ConfigFile[]>([]);
+  const [configPath, setConfigPath] = useState<string>("");
+  const [alreadyLoaded, setAlreadyLoaded] = useState<boolean>(false);
 
-  // 📌 Ottiene il percorso del file `last_config.txt`
   const getLastConfigFilePath = async (): Promise<string> => {
     const historyDir = await invoke<string>("get_history_dir");
     return join(historyDir, LAST_CONFIG_FILE);
   };
 
-  // 📌 Carica le configurazioni predefinite e la cronologia
   const loadConfigs = async () => {
     try {
       const [defaultConfigs, historyData] = await Promise.all([
         invoke<ConfigFile[]>("get_default_configs"),
-        invoke<ConfigFile[]>("get_history_configs")
+        invoke<ConfigFile[]>("get_history_configs"),
       ]);
 
-      // Rimuove il file `last_config.txt` dalla cronologia
       const filteredHistory = historyData.filter((config) => config.name !== LAST_CONFIG_FILE);
-
       setDefaultConfigs(defaultConfigs);
       setHistoryConfigs(filteredHistory);
     } catch (error) {
-      console.error("Errore caricamento configs:", error);
+      console.error("Error loading configurations:", error);
     }
   };
 
-  // 📌 Carica un file di configurazione **e lo salva nella cronologia solo se caricato con successo**
   const handleLoadConfig = async (path: string) => {
     if (!path) {
-      toast.error("Seleziona una configurazione!");
+      toast.error("Please select a configuration!");
       return;
     }
 
     try {
-      // 🔹 Caricamento della configurazione
       await invoke("load_config", { path });
-
-      // 🔹 Se il caricamento ha successo, il file viene salvato nella cronologia
-      const newConfig = await invoke<ConfigFile>("save_config_to_history", { filePath: path });
-
-      setHistoryConfigs(prev => [newConfig, ...prev.filter(c => c.path !== newConfig.path)]);
-      toast.success("Configurazione caricata e salvata nella cronologia!");
-
-      // 🔹 Salva l'ultima configurazione caricata
-      await saveLastConfig(newConfig.path);
+      setConfigPath(path);
+      toast.success("Configuration loaded successfully!");
+      await saveLastConfig(path);
+      setAlreadyLoaded(true);
     } catch (error) {
-      console.error("Errore durante il caricamento:", error);
-      toast.error("Errore durante il caricamento.");
+      console.error("Error loading configuration:", error);
+      toast.error("Failed to load configuration.");
     }
   };
 
-  // 📌 Carica l'ultima configurazione usata
   const loadLastConfig = async () => {
     try {
       const filePath = await getLastConfigFilePath();
@@ -82,31 +71,35 @@ const Settings = () => {
         setConfigPath(savedPath);
       }
     } catch (error) {
-      console.warn("Nessuna configurazione precedente trovata.");
+      console.warn("No previous configuration found.");
     }
   };
 
-  // 📌 Salva l'ultima configurazione selezionata
   const saveLastConfig = async (path: string) => {
     try {
       const filePath = await getLastConfigFilePath();
       await writeTextFile(filePath, path);
     } catch (error) {
-      console.error("Errore nel salvataggio della configurazione:", error);
+      console.error("Error saving configuration:", error);
     }
   };
 
-  // 📌 Carica i dati all'avvio
   useEffect(() => {
     loadConfigs();
     loadLastConfig();
   }, []);
 
-  // 📌 Selezione manuale di un file
+  useEffect(() => {
+    if (status === "Running") {
+      loadConfigs();
+    }
+  }, [status]);
+
+
   const handleSelectFile = async () => {
     try {
       const selectedPath = await open({
-        title: "Seleziona un file di configurazione",
+        title: "Select a configuration file",
         multiple: false,
         filters: [{ name: "Config Files", extensions: ["toml"] }],
       });
@@ -115,40 +108,40 @@ const Settings = () => {
         const pathStr = Array.isArray(selectedPath) ? selectedPath[0] : selectedPath;
         setConfigPath(pathStr);
         await saveLastConfig(pathStr);
-        toast.success("File di configurazione selezionato!");
+        setAlreadyLoaded(false);
+        toast.success("Configuration file selected!");
       } else {
-        toast.error("Nessun file selezionato.");
+        toast.error("No file selected.");
       }
     } catch (error) {
-      console.error("Errore nella selezione del file:", error);
-      toast.error("Errore nella selezione del file.");
+      console.error("Error selecting file:", error);
+      toast.error("Failed to select file.");
     }
   };
 
-  // 📌 Elimina una configurazione dalla cronologia
   const handleDeleteConfig = async (filePath: string) => {
     try {
       await invoke("delete_history_config", { filePath });
       setHistoryConfigs((prev) => prev.filter((config) => config.path !== filePath));
-      toast.success("Configurazione eliminata!");
+      toast.success("Configuration deleted!");
     } catch (error) {
-      console.error("Errore nell'eliminazione della configurazione:", error);
-      toast.error("Errore nell'eliminazione della configurazione.");
+      console.error("Error deleting configuration:", error);
+      toast.error("Failed to delete configuration.");
     }
   };
 
   return (
     <div className="p-6 max-w-3xl mx-auto grid grid-cols-3 gap-4">
-      {/* Configurazioni Predefinite */ }
       <div className="col-span-1 border-r pr-4">
-        <h2 className="text-lg font-semibold mb-2">Configurazioni Predefinite</h2>
+        <h2 className="text-lg font-semibold mb-2">Default Configurations</h2>
         <div className="space-y-2">
           { defaultConfigs.map((config) => (
             <Button
               key={ config.id }
               variant="ghost"
               className="w-full flex justify-start"
-              onClick={ () => setConfigPath(config.path) }
+              onClick={ () => handleLoadConfig(config.path) }
+              disabled={ status === "Running" }
             >
               <File className="mr-2 w-4 h-4"/>
               { config.name }
@@ -157,7 +150,6 @@ const Settings = () => {
         </div>
       </div>
 
-      {/* Input File + Azioni */ }
       <div className="col-span-2">
         <h2 className="text-lg font-semibold mb-2">Carica Configurazione</h2>
         <div className="flex space-x-2">
@@ -170,7 +162,7 @@ const Settings = () => {
           <Button onClick={ handleSelectFile }>
             <FolderOpen className="w-4 h-4"/>
           </Button>
-          <Button onClick={ () => handleLoadConfig(configPath) }>
+          <Button onClick={ () => handleLoadConfig(configPath) } disabled={ status === "Running" || alreadyLoaded }>
             <Upload className="w-4 h-4"/>
           </Button>
         </div>
@@ -187,7 +179,8 @@ const Settings = () => {
               </div>
 
               <div className="flex flex-row gap-2">
-                <Button size="sm" variant="ghost" onClick={ () => handleLoadConfig(config.path) }>
+                <Button size="sm" variant="ghost" onClick={ () => handleLoadConfig(config.path) }
+                        disabled={ status === "Running" }>
                   <Upload className="w-4 h-4"/>
                 </Button>
                 <Button size="sm" variant="destructive" onClick={ () => handleDeleteConfig(config.path) }>

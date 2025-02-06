@@ -1,6 +1,5 @@
 use crate::error::NetworkError;
 use crate::network::state::NetworkState;
-use chrono::Utc;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -10,6 +9,7 @@ use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 use tauri::path::BaseDirectory;
 use tauri::{AppHandle, Manager, State};
+use wg_2024::network::NodeId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigFile {
@@ -143,38 +143,73 @@ pub fn get_default_configs(app_handle: tauri::AppHandle) -> Result<Vec<ConfigFil
 }
 
 #[tauri::command]
-pub fn save_config_to_history(
-    app_handle: tauri::AppHandle,
-    file_path: String,
-) -> Result<ConfigFile, String> {
-    let history_dir = get_history_dir(app_handle)?;
-    let source_path = PathBuf::from(&file_path);
-
-    // Genera nome file univoco
-    let timestamp = Utc::now().format("%Y%m%d%H%M%S");
-    let file_name = format!(
-        "{}_{}",
-        source_path.file_stem().unwrap().to_string_lossy(),
-        timestamp
-    );
-
-    let dest_path = history_dir.join(format!("{}.toml", file_name));
-
-    fs::copy(&source_path, &dest_path).map_err(|e| e.to_string())?;
-
-    Ok(ConfigFile {
-        id: file_name,
-        name: source_path
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .into_owned(),
-        path: dest_path.to_string_lossy().into_owned(),
-        timestamp: Utc::now().timestamp() as u64,
-    })
+pub fn delete_history_config(file_path: String) -> Result<(), String> {
+    fs::remove_file(&file_path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub fn delete_history_config(file_path: String) -> Result<(), String> {
-    fs::remove_file(&file_path).map_err(|e| e.to_string())
+pub fn config_remove_node(node_id: NodeId, state: State<Arc<Mutex<NetworkState>>>) -> Result<(), String> {
+    let mut net_state = state.lock();
+
+    if let Some(config) = &mut net_state.initial_config {
+        config.drone.retain(|d| d.id != node_id);
+        config.client.retain(|c| c.id != node_id);
+        config.server.retain(|s| s.id != node_id);
+
+        for drone in &mut config.drone {
+            drone.connected_node_ids.retain(|&id| id != node_id);
+        }
+        for client in &mut config.client {
+            client.connected_drone_ids.retain(|&id| id != node_id);
+        }
+        for server in &mut config.server {
+            server.connected_drone_ids.retain(|&id| id != node_id);
+        }
+
+        Ok(())
+    } else {
+        Err("No configuration loaded".to_string())
+    }
+}
+
+#[tauri::command]
+pub fn config_remove_edge(
+    node1_id: NodeId,
+    node2_id: NodeId,
+    state: State<Arc<Mutex<NetworkState>>>,
+) -> Result<(), String> {
+    let mut net_state = state.lock();
+
+    if let Some(config) = &mut net_state.initial_config {
+        for drone in &mut config.drone {
+            if drone.id == node1_id {
+                drone.connected_node_ids.retain(|&id| id != node2_id);
+            }
+            if drone.id == node2_id {
+                drone.connected_node_ids.retain(|&id| id != node1_id);
+            }
+        }
+
+        for client in &mut config.client {
+            if client.id == node1_id {
+                client.connected_drone_ids.retain(|&id| id != node2_id);
+            }
+            if client.id == node2_id {
+                client.connected_drone_ids.retain(|&id| id != node1_id);
+            }
+        }
+
+        for server in &mut config.server {
+            if server.id == node1_id {
+                server.connected_drone_ids.retain(|&id| id != node2_id);
+            }
+            if server.id == node2_id {
+                server.connected_drone_ids.retain(|&id| id != node1_id);
+            }
+        }
+
+        Ok(())
+    } else {
+        Err("No configuration loaded".to_string())
+    }
 }

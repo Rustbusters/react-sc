@@ -5,22 +5,22 @@ use wg_2024::network::NodeId;
 
 #[derive(Error, Debug)]
 pub enum NetworkError {
-    #[error("Failed to read config file: {0}")]
+    #[error("Failed to read configuration file: {0}")]
     ConfigFileReadError(#[from] std::io::Error),
 
-    #[error("Failed to parse config file: {0}")]
+    #[error("Failed to parse configuration file: {0}")]
     ConfigParseError(#[from] toml::de::Error),
 
-    #[error("Network already running")]
+    #[error("The network is already running")]
     NetworkAlreadyRunning,
 
-    #[error("Network is not running")]
+    #[error("The network is not running")]
     NetworkNotRunning,
 
     #[error("No configuration loaded")]
     NoConfigLoaded,
 
-    #[error("Invalid configuration for path: {0}")]
+    #[error("Invalid configuration path: {0}")]
     InvalidConfigPath(PathBuf),
 
     #[error("The selected node does not exist: {0}")]
@@ -29,22 +29,22 @@ pub enum NetworkError {
     #[error("The target drone does not exist")]
     TargetDroneNotFound,
 
-    #[error("Drone and target can't be the same drone")]
+    #[error("The source and target drone cannot be the same")]
     SameDroneTarget,
 
-    #[error("Invalid packet drop rate: {0}")]
+    #[error("Invalid Packet Drop Rate value: {0}")]
     InvalidPdr(u8),
 
-    #[error("SendError: {0}")]
+    #[error("Error while sending the message: {0}")]
     SendError(String),
 
-    #[error("Channel not found for node {0}")]
+    #[error("Communication channel not found for node {0}")]
     ChannelNotFound(NodeId),
 
-    #[error("Network in invalid state: {0}")]
+    #[error("The network is in an invalid state: {0}")]
     ValidationError(String),
 
-    #[error("Command send error: {0}")]
+    #[error("Error while sending command: {0}")]
     CommandSendError(String),
 
     #[error("Invalid operation: {0}")]

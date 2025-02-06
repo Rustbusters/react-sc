@@ -3,6 +3,7 @@ import cytoscape from "cytoscape";
 import { invoke } from "@tauri-apps/api/core";
 import { MousePointerClick, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useSimulation } from "@/components/SimulationContext.tsx";
 
 interface GraphComponentProps {
   onNodeSelect: (nodeId: string | null) => void;
@@ -12,6 +13,7 @@ interface GraphComponentProps {
 const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) => {
   const cyRef = useRef<HTMLDivElement>(null);
   const [cy, setCy] = useState<cytoscape.Core | null>(null);
+  const { status } = useSimulation();
 
   const loadGraphData = useCallback(async () => {
     try {
@@ -206,6 +208,43 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
       resizeObserver.disconnect();
     };
   }, [cy]);
+
+  useEffect(() => {
+    if (!cy || status === "Running") return;
+
+    const handleKeyDown = async (event: KeyboardEvent) => {
+      if (event.key !== "Backspace") return;
+      event.preventDefault();
+
+      const selectedNodes = cy.nodes(":selected");
+      const selectedEdges = cy.edges(":selected");
+
+      if (selectedNodes.length > 0) {
+        for (const node of selectedNodes) {
+          const nodeId = node.id();
+          console.log(`Removing node: ${ nodeId }`);
+          await invoke("config_remove_node", { nodeId: Number(nodeId) });
+        }
+        selectedNodes.unselect();
+      }
+
+      if (selectedEdges.length > 0) {
+        for (const edge of selectedEdges) {
+          const source = edge.source().id();
+          const target = edge.target().id();
+          console.log(`Removing edge: ${ source } - ${ target }`);
+          await invoke("config_remove_edge", { node1Id: Number(source), node2Id: Number(target) });
+        }
+        selectedEdges.unselect();
+      }
+
+      loadGraphData();
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [cy, loadGraphData, status]);
+
 
   useEffect(() => {
     if (!cy) return;
