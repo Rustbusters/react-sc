@@ -243,7 +243,14 @@ export async function handleMessage(wsMessage: WebSocketMessage) {
             break;
 
         case "UserNotFound":
-            console.warn(`User ${message.user_id} not found`);
+            // Show error toast
+            userEvents.update((events) => ({
+                ...events,
+                [wsMessage.client_id]: {
+                    message: `User ${message.user_id} not found`,
+                    type: "error",
+                },
+            }));
             break;
 
         case "SendingError":
