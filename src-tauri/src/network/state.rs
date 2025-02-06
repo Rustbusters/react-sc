@@ -2,7 +2,9 @@ use crate::commands::get_history_dir;
 use crate::error::NetworkError;
 use crate::network::configs::SerializableConfig;
 use crate::network::metrics::Metrics;
-use crate::network::network_node::{initialize_clients, initialize_drones, initialize_servers};
+use crate::network::network_initializer::{
+    initialize_clients, initialize_drones, initialize_servers,
+};
 use crate::network::validation::validate_graph;
 use crate::utils::ControllerEvent;
 use chrono::Utc;
@@ -13,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::thread::JoinHandle;
+use std::time::Duration;
 use tauri::AppHandle;
 use wg_2024::config::{Config, Drone};
 use wg_2024::controller::{DroneCommand, DroneEvent};
@@ -62,6 +65,9 @@ pub struct NetworkState {
     /// The current status of the network.
     status: NetworkStatus,
 
+    /// The interval at which hosts should perform network discovery.
+    pub discovery_interval: Option<Duration>,
+
     /// Custom adjacency graph and node metadata for the *current* network.
     pub graph: GraphState,
 
@@ -94,6 +100,7 @@ impl NetworkState {
         NetworkState {
             initial_config: None,
             status: NetworkStatus::Init,
+            discovery_interval: None,
             graph: GraphState::default(),
             node_threads: HashMap::new(),
             inter_node_channels: HashMap::new(),

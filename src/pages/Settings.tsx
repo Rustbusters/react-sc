@@ -5,7 +5,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { toast } from "react-hot-toast";
 import { join } from "@tauri-apps/api/path";
 import { exists, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
-import { File, FolderOpen, Trash, Upload } from "lucide-react";
+import { CircleCheck, File, FolderOpen, Trash, Upload } from "lucide-react";
 import { useSimulation } from "@/components/SimulationContext";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
@@ -27,6 +27,10 @@ const Settings = () => {
   const [alreadyLoaded, setAlreadyLoaded] = useState<boolean>(false);
 
   const [maxMessages, setMaxMessages] = useState<number>(parseInt(localStorage.getItem("maxMessages") || "1000", 10));
+
+  const [discoveryInterval, setDiscoveryInterval] = useState<number>(0);
+
+  const [discoveryIntervalSent, setDiscoveryIntervalSent] = useState<boolean>(true);
 
   const getLastConfigFilePath = async (): Promise<string> => {
     const historyDir = await invoke<string>("get_history_dir");
@@ -143,6 +147,20 @@ const Settings = () => {
     window.dispatchEvent(new Event("storage"));
   }, [maxMessages]);
 
+  useEffect(() => {
+    const fetchDiscoveryInterval = async () => {
+      try {
+        const interval = await invoke<number>("get_discovery_interval");
+        setDiscoveryInterval(interval);
+      } catch (error) {
+        console.error("Failed to fetch discovery interval:", error);
+        toast.error("Error fetching discovery interval.");
+      }
+    };
+
+    fetchDiscoveryInterval();
+  }, []); // Run only on mount
+
   return (
     <div className="p-6 max-w-3xl mx-auto grid grid-cols-3 gap-4">
       <div className="col-span-1 border-r pr-4">
@@ -222,6 +240,41 @@ const Settings = () => {
           } }
           className="w-full"
         />
+      </div>
+
+      {/* Discovery Interval Setting */ }
+      <div className=" space-y-2">
+        <Label htmlFor="discoveryInterval">Discovery Interval (seconds)</Label>
+        <div className="flex flex-row gap-2">
+          <Input
+            id="discoveryInterval"
+            type="number"
+            value={ discoveryInterval === 0 ? "" : discoveryInterval }
+            placeholder="0 = Default"
+            disabled={ status === "Running" }
+            onChange={ (e) => {
+              const value = parseInt(e.target.value, 10);
+              if (!isNaN(value)) {
+                if (value >= 0) {
+                  if (value !== discoveryInterval) {
+                    setDiscoveryInterval(value);
+                    setDiscoveryIntervalSent(false);
+                  }
+                } else {
+                  toast.error("Value must be greater than or equal to 0");
+                }
+              }
+            } }
+            className="flex-1"
+          />
+          <Button onClick={ () => {
+            invoke("set_discovery_interval", { interval: discoveryInterval })
+            setDiscoveryIntervalSent(true);
+          } }
+                  disabled={ discoveryIntervalSent || status === "Running" }>
+            <CircleCheck/>
+          </Button>
+        </div>
       </div>
     </div>
   );

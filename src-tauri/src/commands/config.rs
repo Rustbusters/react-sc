@@ -148,7 +148,10 @@ pub fn delete_history_config(file_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn config_remove_node(node_id: NodeId, state: State<Arc<Mutex<NetworkState>>>) -> Result<(), String> {
+pub fn config_remove_node(
+    node_id: NodeId,
+    state: State<Arc<Mutex<NetworkState>>>,
+) -> Result<(), String> {
     let mut net_state = state.lock();
 
     if let Some(config) = &mut net_state.initial_config {
@@ -212,4 +215,27 @@ pub fn config_remove_edge(
     } else {
         Err("No configuration loaded".to_string())
     }
+}
+
+#[tauri::command]
+pub fn set_discovery_interval(
+    state: State<Arc<Mutex<NetworkState>>>,
+    interval: u64,
+) -> Result<(), String> {
+    let mut net_state = state.lock();
+    if interval == 0 {
+        net_state.discovery_interval = None;
+        return Ok(());
+    }
+    net_state.discovery_interval = Option::from(std::time::Duration::from_secs(interval));
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_discovery_interval(state: State<Arc<Mutex<NetworkState>>>) -> u64 {
+    let net_state = state.lock();
+    net_state
+        .discovery_interval
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }

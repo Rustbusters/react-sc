@@ -1,4 +1,4 @@
-pub mod network_node;
+pub mod network_initializer;
 pub mod state;
 mod validation;
 pub(crate) mod metrics;

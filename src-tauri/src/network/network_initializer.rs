@@ -220,6 +220,7 @@ pub fn initialize_clients(state: &mut NetworkState) -> Result<(), NetworkError> 
         }
 
         let client_clone = client.clone();
+        let discovery_interval = state.discovery_interval.clone();
         let handle = thread::spawn(move || {
             let mut client_host = RustbustersClient::new(
                 client_clone.id,
@@ -227,7 +228,7 @@ pub fn initialize_clients(state: &mut NetworkState) -> Result<(), NetworkError> 
                 cmd_rx, // the client receives commands
                 packet_recv,
                 packet_send,
-                None,
+                discovery_interval,
             );
             client_host.run();
         });
@@ -304,6 +305,7 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
 
         let server_clone = server.clone();
 
+        let discovery_interval = state.discovery_interval.clone();
         let server_istance = RustBustersServer::new(
             server_clone.id,
             evt_tx,
@@ -311,7 +313,7 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
             packet_send,
             packet_recv,
             server_controller_sender.clone(),
-            None,
+            discovery_interval,
         );
 
         let handle = server_istance.run().unwrap();
