@@ -192,6 +192,24 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
   useEffect(() => {
     if (!cy) return;
 
+    // Aggiorna layout quando la finestra viene ridimensionata
+    const resizeObserver = new ResizeObserver(() => {
+      cy.resize();
+      cy.fit();
+    });
+
+    if (cyRef.current) {
+      resizeObserver.observe(cyRef.current);
+    }
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [cy]);
+
+  useEffect(() => {
+    if (!cy) return;
+
     const handleSelect = (event: cytoscape.EventObject) => {
       const nodeId = event.target.id();
       console.log("Nodo selezionato:", nodeId);
@@ -241,7 +259,7 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
   }, [loadGraphData, setRefreshGraph]);
 
   return (
-    <div className="relative flex flex-col h-full w-full">
+    <div className="relative flex flex-col h-full w-full min-w-0 overflow-hidden">
       {/* Bottone posizionato in alto a destra */ }
       <Button
         onClick={ loadGraphData }

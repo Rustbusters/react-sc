@@ -1,4 +1,5 @@
 use crate::error::NetworkError;
+use crate::network::metrics::Metrics;
 use crate::network::network_node::{initialize_clients, initialize_drones, initialize_servers};
 use crate::network::validation::validate_graph;
 use crate::utils::ControllerEvent;
@@ -12,7 +13,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use wg_2024::config::{Config, Drone, Server};
 use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::network::NodeId;
-use wg_2024::packet::Packet;
+use wg_2024::packet::{Ack, FloodRequest, Fragment, Nack, Packet};
 
 /// Holds adjacency information (custom graph) and per-node metadata.
 #[derive(Debug, Default)]
@@ -28,7 +29,7 @@ pub struct GraphState {
 pub struct NodeMetadata {
     pub node_type: NodeType,
     pub pdr: f32,
-    pub crashed: bool,
+    pub crashed: bool, // TODO: is this needed?
 }
 
 /// Simple enum to distinguish node types.
@@ -40,59 +41,6 @@ pub enum NodeType {
 }
 
 const MAX_HISTORY: usize = 100000;
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
-#[serde(rename_all = "snake_case")]
-pub enum NodeStatsType {
-    PacketsSent,
-    PacketsDropped,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct NodeEventLog {
-    pub timestamp: u64,
-    pub event_type: NodeStatsType,
-}
-
-/// Granular statistics for each node.
-#[derive(Debug, Default)]
-pub struct NodeStats {
-    pub events: VecDeque<NodeEventLog>,
-}
-
-impl NodeStats {
-    /// Record a sent packet event.
-    pub fn record_sent_packet(&mut self) {
-        self.record_event(NodeStatsType::PacketsSent);
-    }
-
-    /// Record a dropped packet event.
-    pub fn record_dropped_packet(&mut self) {
-        self.record_event(NodeStatsType::PacketsDropped);
-    }
-
-    /// Returns a copy of the events for this node.
-    pub fn get_events(&self) -> Vec<NodeEventLog> {
-        self.events.iter().cloned().collect()
-    }
-
-    /// Internal helper to record an event with a timestamp.
-    fn record_event(&mut self, event_type: NodeStatsType) {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or_default();
-
-        self.events.push_back(NodeEventLog {
-            timestamp,
-            event_type,
-        });
-
-        if self.events.len() > MAX_HISTORY {
-            self.events.pop_front();
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum NetworkStatus {
@@ -130,8 +78,7 @@ pub struct NetworkState {
     /// Channels to communicate with servers from the simulation controller.
     pub server_controller_channels: HashMap<NodeId, (Sender<HostCommand>, Receiver<HostEvent>)>,
 
-    /// Granular stats for each drone: NodeId -> NodeStats
-    pub node_stats: HashMap<NodeId, NodeStats>,
+    pub metrics: Metrics,
 
     /// A list of received messages for each node.
     pub received_messages: Vec<ControllerEvent>,
@@ -149,7 +96,7 @@ impl NetworkState {
             drones_controller_channels: HashMap::new(),
             client_controller_channels: HashMap::new(),
             server_controller_channels: HashMap::new(),
-            node_stats: HashMap::new(),
+            metrics: Metrics::default(),
             received_messages: Vec::new(),
         }
     }
@@ -202,6 +149,14 @@ impl NetworkState {
             .collect()
     }
 
+    /// Returns the node type for a given node ID, if available.
+    pub fn get_node_type(&self, node_id: NodeId) -> Option<NodeType> {
+        self.graph
+            .node_info
+            .get(&node_id)
+            .map(|meta| meta.node_type.clone())
+    }
+
     // --------------------------------------------------------------------------
     // Config loading (read-only usage)
     // --------------------------------------------------------------------------
@@ -228,7 +183,7 @@ impl NetworkState {
         self.drones_controller_channels.clear();
         self.client_controller_channels.clear();
         self.server_controller_channels.clear();
-        self.node_stats.clear();
+        self.metrics = Metrics::default();
         self.graph = GraphState::default();
 
         // Store the newly loaded config
@@ -257,7 +212,7 @@ impl NetworkState {
         self.drones_controller_channels.clear();
         self.client_controller_channels.clear();
         self.server_controller_channels.clear();
-        self.node_stats.clear();
+        self.metrics = Metrics::default();
         self.graph = GraphState::default();
 
         // Build the custom graph from the cloned config
@@ -276,19 +231,19 @@ impl NetworkState {
             let (sender, receiver) = crossbeam_channel::unbounded();
             self.inter_node_channels
                 .insert(drone.id, (sender, receiver));
-            self.node_stats.insert(drone.id, NodeStats::default());
+            self.metrics.insert_node(drone.id, NodeType::Drone);
         }
         for client in &local_config.client {
             let (sender, receiver) = crossbeam_channel::unbounded();
             self.inter_node_channels
                 .insert(client.id, (sender, receiver));
-            self.node_stats.insert(client.id, NodeStats::default());
+            self.metrics.insert_node(client.id, NodeType::Client);
         }
         for server in &local_config.server {
             let (sender, receiver) = crossbeam_channel::unbounded();
             self.inter_node_channels
                 .insert(server.id, (sender, receiver));
-            self.node_stats.insert(server.id, NodeStats::default());
+            self.metrics.insert_node(server.id, NodeType::Server);
         }
 
         self.status = NetworkStatus::Running;
@@ -367,32 +322,48 @@ impl NetworkState {
     /// Sends a "Crash" command to a drone, removing it from the current graph and
     /// channels, but does NOT update the static config. The config remains the
     /// original state from which we started.
-    pub fn send_crash_command(&mut self, drone_id: NodeId) -> Result<(), String> {
-        // Send command to the drone if it exists
+    pub fn send_crash_command(&mut self, drone_id: NodeId) -> Result<(), NetworkError> {
+        let node_type = self
+            .get_node_type(drone_id)
+            .ok_or_else(|| NetworkError::NodeNotFound(drone_id.to_string()))?;
+
+        let neighbors = self
+            .graph
+            .adjacency
+            .get(&drone_id)
+            .cloned()
+            .unwrap_or_default();
+
+        for &neighbor in &neighbors {
+            let neighbor_type = self
+                .get_node_type(neighbor)
+                .ok_or_else(|| NetworkError::NodeNotFound(neighbor.to_string()))?;
+            self.send_remove_sender_command(drone_id, &node_type, neighbor)?;
+            self.send_remove_sender_command(neighbor, &neighbor_type, drone_id)?;
+        }
+
         if let Some((cmd_sender, _)) = self.drones_controller_channels.get(&drone_id) {
-            cmd_sender
-                .send(DroneCommand::Crash)
-                .map_err(|_| "Failed to send Crash command")?;
+            cmd_sender.send(DroneCommand::Crash).map_err(|_| {
+                NetworkError::CommandSendError(format!(
+                    "Failed to send Crash command to drone {}",
+                    drone_id
+                ))
+            })?;
+        } else {
+            return Err(NetworkError::ChannelNotFound(drone_id));
         }
 
         debug!("Crashing drone {}", drone_id);
 
-        // Remove from runtime structures
         self.drones_controller_channels.remove(&drone_id);
         self.inter_node_channels.remove(&drone_id);
         self.node_threads.remove(&drone_id);
+        self.graph.node_info.remove(&drone_id);
+        self.graph.adjacency.remove(&drone_id);
 
-        // Mark crashed in the graph
-        if let Some(meta) = self.graph.node_info.get_mut(&drone_id) {
-            meta.crashed = true;
-        }
-
-        // Remove adjacency for the crashed drone
-        if let Some(neighbors) = self.graph.adjacency.remove(&drone_id) {
-            for n in neighbors {
-                if let Some(adj_list) = self.graph.adjacency.get_mut(&n) {
-                    adj_list.retain(|&id| id != drone_id);
-                }
+        for &neighbor in &neighbors {
+            if let Some(adj_list) = self.graph.adjacency.get_mut(&neighbor) {
+                adj_list.retain(|&id| id != drone_id);
             }
         }
 
@@ -585,39 +556,6 @@ impl NetworkState {
     }
 
     // --------------------------------------------------------------------------
-    // Example of how you might record stats in a centralized way.
-    // --------------------------------------------------------------------------
-
-    /// Increment the packets_sent counter for a given node.
-    pub fn record_node_sent_packet(&mut self, node_id: NodeId) {
-        if let Some(stats) = self.node_stats.get_mut(&node_id) {
-            stats.record_sent_packet();
-        }
-    }
-
-    /// Increment the packets_dropped counter for a given node.
-    pub fn record_node_dropped_packet(&mut self, node_id: NodeId) {
-        if let Some(stats) = self.node_stats.get_mut(&node_id) {
-            stats.record_dropped_packet();
-        }
-    }
-
-    /// Returns the stats for a specific node, if available.
-    pub fn get_node_stats(&self, node_id: NodeId) -> Option<&NodeStats> {
-        self.node_stats.get(&node_id)
-    }
-
-    /// Returns a reference to the entire node_stats map.
-    pub fn get_all_node_stats(&self) -> &HashMap<NodeId, NodeStats> {
-        &self.node_stats
-    }
-
-    pub fn get_node_type(&self, node_id: NodeId) -> Option<NodeType> {
-        self.graph
-            .node_info
-            .get(&node_id)
-            .map(|meta| meta.node_type.clone())
-    }
 
     pub fn get_status(&self) -> NetworkStatus {
         self.status.clone()

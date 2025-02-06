@@ -1,15 +1,15 @@
 use crate::network::state::NetworkState;
 use crate::utils::ControllerEvent;
 use common_utils::HostEvent;
-use crossbeam_channel::Receiver;
 use log::{debug, error, info};
 use parking_lot::Mutex;
 use std::sync::Arc;
 use std::thread;
-use tauri::{AppHandle, Emitter};
+use std::time::Duration;
+use tauri::AppHandle;
 use wg_2024::controller::DroneEvent;
 use wg_2024::network::NodeId;
-use wg_2024::packet::{Packet, PacketType, FRAGMENT_DSIZE};
+use wg_2024::packet::{Packet, PacketType};
 
 pub struct Listener {
     state: Arc<Mutex<NetworkState>>,
@@ -21,144 +21,133 @@ impl Listener {
         Self { state, app }
     }
 
+    /// Starts the listener thread.
     pub fn start(self) {
         info!("Starting listener thread");
-
         thread::spawn(move || loop {
-            let mut events_to_process = Vec::new();
+            let events_to_process = self.collect_events();
 
-            {
-                let state_guard = self.state.lock();
-
-                for (&node_id, (_, drone_receiver)) in state_guard.drones_controller_channels.iter()
-                {
-                    if let Ok(event) = drone_receiver.try_recv() {
-                        events_to_process.push(ControllerEvent::Drone { node_id, event });
-                    }
-                }
-
-                for (&node_id, (_, client_receiver)) in
-                    state_guard.client_controller_channels.iter()
-                {
-                    if let Ok(event) = client_receiver.try_recv() {
-                        events_to_process.push(ControllerEvent::Host { node_id, event });
-                    }
-                }
-
-                for (&node_id, (_, server_receiver)) in
-                    state_guard.server_controller_channels.iter()
-                {
-                    if let Ok(event) = server_receiver.try_recv() {
-                        events_to_process.push(ControllerEvent::Host { node_id, event });
-                    }
-                }
-            }
-
-            let mut state_guard = self.state.lock();
             for event in events_to_process {
-                match event {
-                    ControllerEvent::Drone { node_id, event } => {
-                        debug!(
-                            "[LISTENER] DroneController received for drone {}: {:?}",
-                            node_id, event
-                        );
-                        state_guard.received_messages.push(ControllerEvent::Drone {
-                            node_id,
-                            event: event.clone(),
-                        });
-
-                        match event {
-                            DroneEvent::PacketSent(packet) => {
-                                debug!("[LISTENER] - [DRONE {}] PacketSent: {:?}", node_id, packet);
-                                state_guard.record_node_sent_packet(node_id);
-                            }
-                            DroneEvent::PacketDropped(packet) => {
-                                debug!(
-                                    "[LISTENER] - [DRONE {}] PacketDropped: {:?}",
-                                    node_id, packet
-                                );
-                                state_guard.record_node_dropped_packet(node_id);
-                            }
-                            DroneEvent::ControllerShortcut(packet) => match packet.pack_type {
-                                PacketType::Ack(_)
-                                | PacketType::Nack(_)
-                                | PacketType::FloodResponse(_) => {
-                                    self.send_packet_to_destination(packet);
-                                }
-                                _ => {
-                                    error!(
-                                        "[LISTENER] - [DRONE {}] Unexpected packet received: {:?}",
-                                        node_id, packet
-                                    );
-                                }
-                            },
-                        }
-                    }
-                    ControllerEvent::Host { node_id, event } => {
-                        debug!(
-                            "[LISTENER] HostController received for host {}: {:?}",
-                            node_id, event
-                        );
-                        state_guard.received_messages.push(ControllerEvent::Host {
-                            node_id,
-                            event: event.clone(),
-                        });
-
-                        match event {
-                            HostEvent::HostMessageSent(packet) => {
-                                debug!(
-                                    "[LISTENER] - [HOST {}] HostMessageSent: {:?}",
-                                    node_id, packet
-                                );
-                                state_guard.record_node_sent_packet(node_id);
-                            }
-                            HostEvent::HostMessageReceived(packet) => {
-                                debug!(
-                                    "[LISTENER] - [HOST {}] HostMessageReceived: {:?}",
-                                    node_id, packet
-                                );
-                                // TODO: gestire questo caso
-                            }
-                            HostEvent::StatsResponse(stats) => {
-                                debug!(
-                                    "[LISTENER] - [HOST {}] StatsResponse: {:?}",
-                                    node_id, stats
-                                );
-                                if let Err(e) =
-                                    self.app.emit("host_stats", (node_id, stats.clone()))
-                                {
-                                    error!("Failed to emit host_stats: {:?}", e);
-                                }
-                            }
-                            HostEvent::ControllerShortcut(packet) => match packet.pack_type {
-                                PacketType::Ack(_)
-                                | PacketType::Nack(_)
-                                | PacketType::FloodResponse(_) => {
-                                    self.send_packet_to_destination(packet);
-                                }
-                                _ => {
-                                    error!(
-                                        "[LISTENER] - [HOST {}] Unexpected packet received: {:?}",
-                                        node_id, packet
-                                    );
-                                }
-                            },
-                        }
-                    }
-                }
+                debug!("Received event: {:?}", event);
+                self.process_event(event);
             }
 
-            // thread::sleep(std::time::Duration::from_millis(10));
+            thread::sleep(Duration::from_millis(10)); // TODO: testare
         });
     }
 
+    /// Collects all the events from the controller channels.
+    fn collect_events(&self) -> Vec<ControllerEvent> {
+        let mut events = Vec::new();
+        let state_guard = self.state.lock();
+
+        for (&node_id, (_, drone_receiver)) in state_guard.drones_controller_channels.iter() {
+            if let Ok(event) = drone_receiver.try_recv() {
+                events.push(ControllerEvent::Drone { node_id, event });
+            }
+        }
+
+        for (&node_id, (_, client_receiver)) in state_guard.client_controller_channels.iter() {
+            if let Ok(event) = client_receiver.try_recv() {
+                events.push(ControllerEvent::Host { node_id, event });
+            }
+        }
+
+        for (&node_id, (_, server_receiver)) in state_guard.server_controller_channels.iter() {
+            if let Ok(event) = server_receiver.try_recv() {
+                events.push(ControllerEvent::Host { node_id, event });
+            }
+        }
+
+        events
+    }
+
+    /// Processes the event by updating the metrics or forwarding the packet if it's a shortcut.
+    fn process_event(&self, event: ControllerEvent) {
+        {
+            let mut state = self.state.lock();
+            state.received_messages.push(event.clone());
+        }
+
+        match event {
+            ControllerEvent::Drone { node_id, event } => {
+                self.handle_drone_event(node_id, event);
+            }
+            ControllerEvent::Host { node_id, event } => {
+                self.handle_host_event(node_id, event);
+            }
+        }
+    }
+
+    /// Handles the events coming from the drones updating the metrics or forwarding the packet if it's a shortcut.
+    fn handle_drone_event(&self, node_id: NodeId, event: DroneEvent) {
+        let mut state = self.state.lock();
+        match event {
+            DroneEvent::PacketSent(packet) => {
+                state.metrics.update_drone_packet_sent(node_id, &packet);
+            }
+            DroneEvent::PacketDropped(packet) => {
+                state.metrics.update_drone_packet_dropped(node_id, &packet);
+            }
+            DroneEvent::ControllerShortcut(packet) => match packet.pack_type {
+                PacketType::Ack(_) | PacketType::Nack(_) | PacketType::FloodResponse(_) => {
+                    state.metrics.update_drone_packet_sent(node_id, &packet);
+                    if let Some(drone_metric) = state.metrics.drone_metrics.get_mut(&node_id) {
+                        drone_metric.record_shortcut();
+                    }
+                    drop(state); // TODO: check this
+                    self.send_packet_to_destination(packet);
+                }
+                _ => {
+                    error!(
+                        "[LISTENER] - [DRONE {}] Unexpected packet received: {:?}",
+                        node_id, packet
+                    );
+                }
+            },
+        }
+    }
+
+    /// Handles the events coming from the hosts updating the metrics or forwarding the packet if it's a shortcut.
+    fn handle_host_event(&self, node_id: NodeId, event: HostEvent) {
+        let mut state = self.state.lock();
+        match event {
+            HostEvent::HostMessageSent(destination, _message, duration) => {
+                state
+                    .metrics
+                    .update_host_message_sent(node_id, destination, duration);
+            }
+            HostEvent::PacketSent(packet_header) => {
+                state
+                    .metrics
+                    .update_host_packet_sent(node_id, packet_header);
+            }
+            HostEvent::ControllerShortcut(packet) => match packet.pack_type {
+                PacketType::Ack(_) | PacketType::Nack(_) | PacketType::FloodResponse(_) => {
+                    if let Some(host_metric) = state.metrics.host_metrics.get_mut(&node_id) {
+                        host_metric.record_shortcut();
+                    }
+                    self.send_packet_to_destination(packet);
+                }
+                _ => {
+                    error!(
+                        "[LISTENER] - [HOST {}] Unexpected packet received: {:?}",
+                        node_id, packet
+                    );
+                }
+            },
+        }
+    }
+
+    /// Sends the packet to the destination node.
     fn send_packet_to_destination(&self, packet: Packet) {
         if let Some(dest_id) = packet.routing_header.destination() {
-            if let Some((sender, _)) = self.state.lock().inter_node_channels.get(&dest_id) {
-                if sender.send(packet).is_err() {
+            let mut state = self.state.lock();
+            if let Some((sender, _)) = state.inter_node_channels.get(&dest_id) {
+                if let Err(err) = sender.send(packet) {
                     error!(
-                        "[LISTENER] Failed to send packet to destination {}",
-                        dest_id
+                        "[LISTENER] Failed to send packet to destination {}: {:?}",
+                        dest_id, err
                     );
                 } else {
                     debug!("[LISTENER] Packet sent to destination {}", dest_id);

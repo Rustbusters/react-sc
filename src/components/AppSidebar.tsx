@@ -3,16 +3,16 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
-import { ChartLine, Home, Inbox, Play, Search, Send, Settings } from "lucide-react";
+import { ChartLine, Inbox, Play, Search, Send, Settings } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
 const items = [
-  { title: "Home", url: "/", icon: Home },
   { title: "Simulazione", url: "/simulation", icon: Play },
   { title: "Inbox", url: "/inbox", icon: Inbox },
   { title: "Stats", url: "/stats", icon: ChartLine },
@@ -23,12 +23,21 @@ const items = [
 
 export function AppSidebar() {
   const location = useLocation();
+  const { state } = useSidebar();
 
   return (
     <Sidebar collapsible="icon" variant="floating">
-      <SidebarContent>
+      <SidebarHeader className="pb-0">
+        <NavLink to="/">
+          <img
+            src={ state === "collapsed" ? "/logo_square.svg" : "/logo.svg" }
+            alt="Logo"
+            className="h-10 w-auto transition-all duration-300"
+          />
+        </NavLink>
+      </SidebarHeader>
+      <SidebarContent className="pt-0">
         <SidebarGroup>
-          <SidebarGroupLabel>Simulation Controller</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               { items.map((item) => {

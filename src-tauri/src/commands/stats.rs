@@ -1,8 +1,6 @@
-use crate::error::NetworkError;
-use crate::network::state::{NetworkState, NodeStatsType, NodeType};
+use crate::network::state::{NetworkState, NodeType};
 use crate::utils::ControllerEvent;
-use common_utils::{HostCommand, HostEvent};
-use crossbeam_channel::Sender;
+use common_utils::HostEvent;
 use parking_lot::Mutex;
 use serde_json::json;
 use serde_json::Value;
@@ -13,86 +11,38 @@ use wg_2024::controller::DroneEvent;
 use wg_2024::network::NodeId;
 
 #[tauri::command]
-pub fn get_drone_history(state: State<Arc<Mutex<NetworkState>>>, node_id: NodeId) -> Value {
-    let state = state.lock();
-    let stats = state.get_all_node_stats();
-
-    if let Some(drone_stats) = stats.get(&node_id) {
-        json!({
-            "node_id": node_id,
-            "history": drone_stats.get_events()
-        })
-    } else {
-        json!({ "error": "Drone not found" })
-    }
-}
-
-#[tauri::command]
 pub fn get_drone_statistics(state: State<Arc<Mutex<NetworkState>>>, node_id: NodeId) -> Value {
     let state = state.lock();
-    let stats = state.get_all_node_stats();
-
-    if let Some(drone_stats) = stats.get(&node_id) {
-        let total_sent = drone_stats
-            .events
-            .iter()
-            .filter(|e| e.event_type == NodeStatsType::PacketsSent)
-            .count() as u64;
-
-        let total_dropped = drone_stats
-            .events
-            .iter()
-            .filter(|e| e.event_type == NodeStatsType::PacketsDropped)
-            .count() as u64;
-
+    if let Some(drone_metrics) = state.metrics.drone_metrics.get(&node_id) {
         json!({
             "node_id": node_id,
-            "total_packets_sent": total_sent,
-            "total_packets_dropped": total_dropped
+            "total_packets_sent": drone_metrics.number_of_packets_sent(),
+            "total_packets_dropped": drone_metrics.drops,
+            "pdr": drone_metrics.current_pdr,
+            "shortcuts_used": drone_metrics.shortcuts,
+            "packet_type_counts": drone_metrics.packet_type_counts,
         })
     } else {
         json!({ "error": "Drone not found" })
     }
-}
-
-#[tauri::command]
-pub fn get_all_drones_history(state: State<Arc<Mutex<NetworkState>>>) -> Value {
-    let state = state.lock();
-    let stats = state.get_all_node_stats();
-
-    let history_map: HashMap<String, Vec<_>> = stats
-        .iter()
-        .map(|(node_id, drone_stats)| (node_id.to_string(), drone_stats.get_events()))
-        .collect();
-
-    json!({ "history": history_map })
 }
 
 #[tauri::command]
 pub fn get_all_drones_statistics(state: State<Arc<Mutex<NetworkState>>>) -> Value {
     let state = state.lock();
-    let stats = state.get_all_node_stats();
-
-    let stats_map: HashMap<String, Value> = stats
+    let stats_map: HashMap<String, Value> = state
+        .metrics
+        .drone_metrics
         .iter()
-        .map(|(node_id, drone_stats)| {
-            let total_sent = drone_stats
-                .events
-                .iter()
-                .filter(|e| e.event_type == NodeStatsType::PacketsSent)
-                .count() as u64;
-
-            let total_dropped = drone_stats
-                .events
-                .iter()
-                .filter(|e| e.event_type == NodeStatsType::PacketsDropped)
-                .count() as u64;
-
+        .map(|(node_id, metrics)| {
             (
                 node_id.to_string(),
                 json!({
-                    "total_packets_sent": total_sent,
-                    "total_packets_dropped": total_dropped
+                    "total_packets_sent": metrics.number_of_packets_sent(),
+                    "total_packets_dropped": metrics.drops,
+                    "pdr": metrics.current_pdr,
+                    "shortcuts_used": metrics.shortcuts,
+                    "packet_type_counts": metrics.packet_type_counts,
                 }),
             )
         })
@@ -104,34 +54,31 @@ pub fn get_all_drones_statistics(state: State<Arc<Mutex<NetworkState>>>) -> Valu
 #[tauri::command]
 pub fn get_global_statistics(state: State<Arc<Mutex<NetworkState>>>) -> Value {
     let state = state.lock();
-    let stats = state.get_all_node_stats();
 
-    let mut total_packets_sent = 0;
-    let mut total_packets_dropped = 0;
-    let mut drones_by_sent: Vec<(NodeId, u64)> = Vec::new();
-    let mut drones_by_dropped: Vec<(NodeId, u64)> = Vec::new();
+    let total_packets_sent: u64 = state
+        .metrics
+        .drone_metrics
+        .values()
+        .map(|m| m.number_of_packets_sent())
+        .sum();
 
-    for (node_id, drone_stats) in stats.iter() {
-        let sent = drone_stats
-            .events
-            .iter()
-            .filter(|e| e.event_type == NodeStatsType::PacketsSent)
-            .count() as u64;
+    let total_packets_dropped: u64 = state.metrics.drone_metrics.values().map(|m| m.drops).sum();
 
-        let dropped = drone_stats
-            .events
-            .iter()
-            .filter(|e| e.event_type == NodeStatsType::PacketsDropped)
-            .count() as u64;
+    let mut drones_by_sent: Vec<_> = state
+        .metrics
+        .drone_metrics
+        .iter()
+        .map(|(node_id, metrics)| (*node_id, metrics.number_of_packets_sent()))
+        .collect();
 
-        total_packets_sent += sent;
-        total_packets_dropped += dropped;
+    let mut drones_by_dropped: Vec<_> = state
+        .metrics
+        .drone_metrics
+        .iter()
+        .map(|(node_id, metrics)| (*node_id, metrics.drops))
+        .collect();
 
-        drones_by_sent.push((*node_id, sent));
-        drones_by_dropped.push((*node_id, dropped));
-    }
-
-    // Sort drones by sent and dropped packets
+    // Ordina per numero di pacchetti inviati e pacchetti scartati
     drones_by_sent.sort_by(|a, b| b.1.cmp(&a.1));
     drones_by_dropped.sort_by(|a, b| b.1.cmp(&a.1));
 
@@ -183,23 +130,17 @@ pub fn get_new_messages(
                     }),
                 },
                 ControllerEvent::Host { node_id, event } => match event {
-                    HostEvent::HostMessageSent(message) => json!({
+                    HostEvent::HostMessageSent(destination, message, duration) => json!({
                         "id": message_id,
                         "type": "HostEvent::HostMessageSent",
                         "node": node_id,
                         "message": format!("{:?}", message)
                     }),
-                    HostEvent::HostMessageReceived(message) => json!({
+                    HostEvent::PacketSent(packet_header) => json!({
                         "id": message_id,
-                        "type": "HostEvent::HostMessageReceived",
+                        "type": "HostEvent::PacketSent",
                         "node": node_id,
-                        "message": format!("{:?}", message)
-                    }),
-                    HostEvent::StatsResponse(stats) => json!({
-                        "id": message_id,
-                        "type": "HostEvent::StatsResponse",
-                        "node": node_id,
-                        "stats": format!("{:?}", stats)
+                        "packet": format!("{:?}", packet_header)
                     }),
                     HostEvent::ControllerShortcut(packet) => json!({
                         "id": message_id,
@@ -244,24 +185,21 @@ pub fn get_network_infos(state: State<Arc<Mutex<NetworkState>>>) -> Value {
 
         if let NodeType::Drone = metadata.node_type {
             node_data["pdr"] = json!(metadata.pdr);
-        }
 
-        let node_stats = state.get_node_stats(node_id);
-        if let Some(stats) = node_stats {
-            let total_sent = stats
-                .events
-                .iter()
-                .filter(|e| e.event_type == NodeStatsType::PacketsSent)
-                .count() as u64;
-
-            let total_dropped = stats
-                .events
-                .iter()
-                .filter(|e| e.event_type == NodeStatsType::PacketsDropped)
-                .count() as u64;
-
-            node_data["packets_sent"] = json!(total_sent);
-            node_data["packets_dropped"] = json!(total_dropped);
+            if let Some(metrics) = state.metrics.drone_metrics.get(&node_id) {
+                node_data["current_pdr"] = json!(metrics.current_pdr);
+                node_data["packets_sent"] = json!(metrics.number_of_packets_sent());
+                node_data["packets_dropped"] = json!(metrics.drops);
+                node_data["shortcuts"] = json!(metrics.shortcuts);
+            }
+        } else if let Some(metrics) = state.metrics.host_metrics.get(&node_id) {
+            node_data["packets_sent"] = json!(metrics.number_of_packets_sent()); // TODO: pacchetti inviati, non MsgFragment inviati
+            node_data["packets_acked"] = json!(metrics
+                .dest_stats
+                .values()
+                .map(|(_, acked)| acked)
+                .sum::<u64>());
+            node_data["shortcuts"] = json!(metrics.shortcuts);
         }
 
         nodes_info.push(node_data);
@@ -270,90 +208,118 @@ pub fn get_network_infos(state: State<Arc<Mutex<NetworkState>>>) -> Value {
     json!({ "nodes": nodes_info })
 }
 
-#[tauri::command]
-pub fn get_node_info(state: State<Arc<Mutex<NetworkState>>>, node_id: NodeId) -> Value {
-    let state = state.lock();
+use crate::network::metrics::PacketTypeLabel;
+use serde::{Deserialize, Serialize};
 
-    if let Some(metadata) = state.graph.node_info.get(&node_id) {
-        let mut connections = state
-            .graph
-            .adjacency
-            .get(&node_id)
-            .cloned()
-            .unwrap_or_default();
-        connections.sort();
-        let mut node_data = json!({
-            "node_id": node_id,
-            "type": match metadata.node_type {
-                NodeType::Drone => "Drone",
-                NodeType::Client => "Client",
-                NodeType::Server => "Server",
-            },
-            "connections": connections,
-        });
+#[derive(Serialize, Deserialize)]
+pub struct NodeInfo {
+    pub node_id: NodeId,
+    pub node_type: String,
+    pub connections: Vec<NodeId>,
+    pub metrics: NodeMetrics,
+}
 
-        if let NodeType::Drone = metadata.node_type {
-            node_data["pdr"] = json!(metadata.pdr);
-        }
-
-        let node_stats = state.get_node_stats(node_id);
-        if let Some(stats) = node_stats {
-            let total_sent = stats
-                .events
-                .iter()
-                .filter(|e| e.event_type == NodeStatsType::PacketsSent)
-                .count() as u64;
-
-            let total_dropped = stats
-                .events
-                .iter()
-                .filter(|e| e.event_type == NodeStatsType::PacketsDropped)
-                .count() as u64;
-
-            node_data["packets_sent"] = json!(total_sent);
-            node_data["packets_dropped"] = json!(total_dropped);
-        }
-
-        node_data
-    } else {
-        json!({ "error": "Node not found" })
-    }
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "category")]
+pub enum NodeMetrics {
+    Drone {
+        pdr: f32,
+        current_pdr: f32,
+        packets_sent: u64,
+        packets_dropped: u64,
+        shortcuts_used: u64,
+        packet_type_counts: HashMap<PacketTypeLabel, u64>,
+    },
+    Host {
+        packets_sent: u64,
+        packets_acked: u64,
+        shortcuts_used: u64,
+        packet_type_counts: HashMap<PacketTypeLabel, u64>,
+        latencies: Vec<u64>, // Millisecondi
+    },
+    None, // Per nodi senza metriche
 }
 
 #[tauri::command]
-pub fn get_host_stats(
+pub fn get_node_info(
     state: State<Arc<Mutex<NetworkState>>>,
     node_id: NodeId,
-) -> Result<(), NetworkError> {
+) -> Result<NodeInfo, String> {
     let state = state.lock();
 
-    let node_type = state
-        .get_node_type(node_id)
-        .ok_or_else(|| NetworkError::NodeNotFound(node_id.to_string()))?;
+    let metadata = state
+        .graph
+        .node_info
+        .get(&node_id)
+        .ok_or_else(|| format!("Node {} not found", node_id))?;
 
-    let send_stats_request = |sender: &Sender<HostCommand>| {
-        sender
-            .send(HostCommand::StatsRequest)
-            .map_err(|_| NetworkError::CommandSendError("HostCommand::StatsRequest".to_string()))
+    let connections = state
+        .graph
+        .adjacency
+        .get(&node_id)
+        .cloned()
+        .unwrap_or_default();
+
+    let node_type = match metadata.node_type {
+        NodeType::Drone => "Drone",
+        NodeType::Client => "Client",
+        NodeType::Server => "Server",
     };
 
-    match node_type {
-        NodeType::Client => {
-            let sender = state
-                .client_controller_channels
-                .get(&node_id)
-                .map(|(s, _)| s)
-                .ok_or_else(|| NetworkError::NodeNotFound(node_id.to_string()))?;
-            send_stats_request(sender)
+    let metrics = match metadata.node_type {
+        NodeType::Drone => {
+            let drone_metrics = state.metrics.drone_metrics.get(&node_id);
+            NodeMetrics::Drone {
+                pdr: metadata.pdr,
+                current_pdr: drone_metrics.map_or(0.0, |m| m.current_pdr),
+                packets_sent: drone_metrics.map_or(0, |m| m.number_of_packets_sent()),
+                packets_dropped: drone_metrics.map_or(0, |m| m.drops),
+                shortcuts_used: drone_metrics.map_or(0, |m| m.shortcuts),
+                packet_type_counts: drone_metrics
+                    .map_or(HashMap::new(), |m| m.packet_type_counts.clone()),
+            }
         }
-        NodeType::Server => {
-            let sender = state
-                .server_controller_channels
-                .get(&node_id)
-                .map(|(s, _)| s)
-                .ok_or_else(|| NetworkError::NodeNotFound(node_id.to_string()))?;
-            send_stats_request(sender)
+        NodeType::Client | NodeType::Server => {
+            let host_metrics = state.metrics.host_metrics.get(&node_id);
+            NodeMetrics::Host {
+                packets_sent: host_metrics.map_or(0, |m| m.number_of_packets_sent()),
+                packets_acked: host_metrics
+                    .map_or(0, |m| m.dest_stats.values().map(|(_, acked)| acked).sum()),
+                shortcuts_used: host_metrics.map_or(0, |m| m.shortcuts),
+                packet_type_counts: host_metrics
+                    .map_or(HashMap::new(), |m| m.packet_type_counts.clone()),
+                latencies: host_metrics.map_or(vec![], |m| {
+                    m.latencies
+                        .iter()
+                        .map(|lat| lat.as_millis() as u64)
+                        .collect()
+                }),
+            }
         }
-        _ => Err(NetworkError::InvalidOperation(node_id.to_string())),
+    };
+
+    Ok(NodeInfo {
+        node_id,
+        node_type: node_type.to_string(),
+        connections,
+        metrics,
+    })
+}
+
+#[tauri::command]
+pub fn get_host_stats(state: State<Arc<Mutex<NetworkState>>>, node_id: NodeId) -> Value {
+    let state = state.lock();
+
+    if let Some(metrics) = state.metrics.host_metrics.get(&node_id) {
+        json!({
+            "node_id": node_id,
+            "packets_sent": metrics.dest_stats.values().map(|(sent, _)| sent).sum::<u64>(),
+            "packets_acked": metrics.dest_stats.values().map(|(_, acked)| acked).sum::<u64>(),
+            "shortcuts_used": metrics.shortcuts,
+            "packet_type_counts": metrics.packet_type_counts,
+            "latencies": metrics.latencies.iter().map(|lat| lat.as_millis()).collect::<Vec<_>>(),
+        })
+    } else {
+        json!({ "error": "Host not found" })
     }
 }

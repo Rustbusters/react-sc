@@ -1,6 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
 import PieChart from "../components/PieChart"
-import LineChart from "../components/LineChart"
 import BarChart from "../components/BarChart"
 import Title from '../components/common/Title';
 
@@ -52,7 +51,7 @@ const Server: React.FC<ServerProps> = ({ id, stats, messages, activeUsers }) => 
     }, [window.location.pathname]);
 
     return (
-        <div className="p-8 flex flex-1 bg-gray-50 overflow-y-scroll max-h-screen">
+        <div className="p-8 flex flex-1 bg-gray-50 dark:bg-black overflow-y-scroll max-h-screen">
             <div className="flex flex-col flex-1">
                 <main>
                     <Title title={`Server ${id}`} label={`This screen displays the server's ${id} statistics on messages/fragments sent/received and the exchanged messages on the network.`} />
@@ -109,24 +108,24 @@ const Table = <T,>({ data, columns, rowsPerPage = 5 }: TableProps<T>) => {
     return (
         <React.Fragment>
             {data && data.length !== 0 ? <div className="flex flex-col">
-                <div className="-m-1.5 overflow-x-auto">
+                <div className="-m-1.5 overflow-x-auto mx-0 bg-white dark:bg-slate-900 rounded-lg">
                     <div className="p-1.5 min-w-full inline-block align-middle">
                         <div className="overflow-hidden">
-                            <table className="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+                            <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                                 <thead>
                                     <tr>
                                         {columns.map((col) => (
-                                            <th key={String(col.key)} className="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">
+                                            <th key={String(col.key)} className="px-6 py-3 text-start text-xs font-medium text-slate-500 uppercase">
                                                 {col.label}
                                             </th>
                                         ))}
                                     </tr>
                                 </thead>
-                                <tbody className="w-full h-[420px] divide-y divide-gray-200 dark:divide-neutral-700">
+                                <tbody className="w-full h-[420px] divide-y divide-gray-200 dark:divide-slate-700">
                                     {paginatedData.map((item, index) => (
                                         <tr key={index} className="h-[80px]">
                                             {columns.map((col) => (
-                                                <td key={String(col.key)} className="px-6 py-4 w-[25vw] h-[80px] max-h-[80px] overflow-y-scroll text-sm text-gray-800 dark:text-neutral-200">
+                                                <td key={String(col.key)} className="px-6 py-4 w-[25vw] h-[80px] max-h-[80px] overflow-y-scroll text-sm text-gray-800 dark:text-slate-300">
                                                     {col.key != "message" ? (col.render ? col.render(item[col.key], item) : String(item[col.key])) :
                                                         <ExpandableCell content={col.render ? col.render(item[col.key], item) : String(item[col.key])} />
                                                     }
@@ -198,7 +197,7 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
     return (
         <div className="flex items-center justify-center space-x-2">
             <button
-                className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 disabled:opacity-50"
+                className="px-3 py-2 bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-white rounded-md hover:bg-gray-300 dark:hover:bg-slate-500 disabled:opacity-50"
                 onClick={() => onPageChange(currentPage - 1)}
                 disabled={currentPage === 1}
             >
@@ -208,7 +207,7 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
             {pages.map((page) => (
                 <button
                     key={page}
-                    className={`px-3 py-2 rounded-md ${currentPage === page ? "bg-indigo-600 text-white" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    className={`px-3 py-2 rounded-md ${currentPage === page ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-900 dark:text-white dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-500"
                         }`}
                     onClick={() => onPageChange(page)}
                 >
@@ -217,7 +216,7 @@ const Pagination: React.FC<PaginationProps> = ({ currentPage, totalPages, onPage
             ))}
 
             <button
-                className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 disabled:opacity-50"
+                className="px-3 py-2 bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-white rounded-md hover:bg-gray-300 dark:hover:bg-slate-500 disabled:opacity-50"
                 onClick={() => onPageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
             >

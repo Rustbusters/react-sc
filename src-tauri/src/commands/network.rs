@@ -53,6 +53,7 @@ pub fn stop_network(
     info!("Stopping the network...");
 
     // 🔹 Invia il comando "Crash" a tutti i droni
+    // TODO: fix crash command
     for (drone_id, (sender, _receiver)) in &net_state.drones_controller_channels {
         if sender.send(DroneCommand::Crash).is_err() {
             error!("Failed to send 'Crash' command to drone {}", drone_id);
@@ -96,7 +97,8 @@ pub fn stop_network(
     net_state.drones_controller_channels.clear();
     net_state.client_controller_channels.clear();
     net_state.server_controller_channels.clear();
-    net_state.node_stats.clear();
+    net_state.node_threads.clear();
+    net_state.metrics = Default::default();
     net_state.graph = GraphState::default();
 
     net_state.set_status(NetworkStatus::Stopped);

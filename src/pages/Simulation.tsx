@@ -16,10 +16,10 @@ const Simulation = () => {
   return (
     <div className="flex flex-col w-full h-full">
       <div className="flex flex-1">
-        <div className="flex-1 w-full h-full">
+        <div className="w-1/2 h-full">
           <GraphComponent onNodeSelect={ setSelectedNode } setRefreshGraph={ setRefreshGraph }/>
         </div>
-        <div className="w-1/2 ">
+        <div className="w-1/2 h-full">
           <NetworkInfos/>
         </div>
       </div>

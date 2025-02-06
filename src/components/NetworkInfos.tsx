@@ -2,14 +2,17 @@ import { useEffect, useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { invoke } from "@tauri-apps/api/core";
 import { LaptopIcon, ServerIcon } from "lucide-react";
-import { PiDrone } from "react-icons/pi"; // Corretto LaptopIcon
+import { PiDrone } from "react-icons/pi";
 
 interface NodeInfo {
   node_id: number;
   type: string;
   pdr?: number;
-  packets_sent?: number;
+  current_pdr?: number;
+  packets_sent: number;
   packets_dropped?: number;
+  packets_acked?: number;
+  shortcuts: number;
   connections: number[];
 }
 
@@ -24,7 +27,7 @@ const NetworkInfos = () => {
       console.log(response);
       setNetworkData(response.nodes);
     } catch (err) {
-      setError("Errore nel recupero delle informazioni di rete.");
+      setError("Error fetching network infos");
       console.error(err);
     } finally {
       setLoading(false);
@@ -33,7 +36,7 @@ const NetworkInfos = () => {
 
   useEffect(() => {
     fetchNetworkInfos();
-    const interval = setInterval(fetchNetworkInfos, 2000);
+    const interval = setInterval(fetchNetworkInfos, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -48,10 +51,11 @@ const NetworkInfos = () => {
           <TableRow>
             <TableHead>ID</TableHead>
             <TableHead>Type</TableHead>
-            <TableHead>PDR</TableHead>
+            <TableHead>PDR/Estimated</TableHead>
             <TableHead>Connections</TableHead>
             <TableHead>Packets Sent</TableHead>
-            <TableHead>Packets Dropped</TableHead>
+            <TableHead>Dropped/Acked</TableHead>
+            <TableHead>Shortcuts</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -60,20 +64,22 @@ const NetworkInfos = () => {
               <TableRow key={ node.node_id } className="hover:bg-gray-100">
                 <TableCell className="font-medium">{ node.node_id }</TableCell>
                 <TableCell className="flex items-center gap-2">
-                  { node.type === "Drone" && <PiDrone className="w-5 h-5  text-[#9ACDC8]" strokeWidth={ 2.5 }/> }
-                  { node.type === "Server" && <ServerIcon className="w-5 h-5  text-[#EDCB95]" strokeWidth={ 2.5 }/> }
-                  { node.type === "Client" && <LaptopIcon className="w-5 h-5  text-[#C3D59D]" strokeWidth={ 2.5 }/> }
-                  {/*<span>{ node.type }</span>*/ }
+                  { node.type === "Drone" && <PiDrone className="w-5 h-5 text-[#9ACDC8]" strokeWidth={ 2.5 }/> }
+                  { node.type === "Server" && <ServerIcon className="w-5 h-5 text-[#EDCB95]" strokeWidth={ 2.5 }/> }
+                  { node.type === "Client" && <LaptopIcon className="w-5 h-5 text-[#C3D59D]" strokeWidth={ 2.5 }/> }
                 </TableCell>
-                <TableCell>{ node.pdr !== undefined ? node.pdr.toFixed(2) : "-" }</TableCell>
+                <TableCell>{ node.pdr !== undefined ? node.pdr.toFixed(2) : "-" }/{ node.current_pdr !== undefined ? node.current_pdr.toFixed(2) : "-" }</TableCell>
                 <TableCell>{ node.connections.length > 0 ? node.connections.join(", ") : "-" }</TableCell>
                 <TableCell>{ node.packets_sent ?? "-" }</TableCell>
-                <TableCell>{ node.packets_dropped ?? "-" }</TableCell>
+                <TableCell>{ node.packets_dropped ?? node.packets_acked }</TableCell>
+                <TableCell>{ node.shortcuts ?? "-" }</TableCell>
               </TableRow>
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={ 6 } className="text-center">Nessun dato disponibile</TableCell>
+              <TableCell colSpan={ 8 } className="text-center">
+                Nessun dato disponibile
+              </TableCell>
             </TableRow>
           ) }
         </TableBody>

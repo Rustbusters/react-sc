@@ -95,8 +95,15 @@
         const file = input.files?.[0];
 
         if (file && isImageFile(file)) {
-            imageData = await fileToBase64(file);
-            imagePreview = imageData;
+            try {
+                imageData = await fileToBase64(file);
+                imagePreview = imageData;
+            } catch (error) {
+                console.error('Error processing image:', error);
+                toastMessage = "Failed to process image. Please try again.";
+                toastId++;
+                showToast = true;
+            }
         }
         input.value = "";
     }
@@ -110,8 +117,15 @@
                 const file = item.getAsFile();
                 if (file && isImageFile(file)) {
                     event.preventDefault();
-                    imageData = await fileToBase64(file);
-                    imagePreview = imageData;
+                    try {
+                        imageData = await fileToBase64(file);
+                        imagePreview = imageData;
+                    } catch (error) {
+                        console.error('Error processing pasted image:', error);
+                        toastMessage = "Failed to process image. Please try again.";
+                        toastId++;
+                        showToast = true;
+                    }
                     return;
                 }
             }
@@ -210,8 +224,15 @@
 
         const file = event.dataTransfer?.files[0];
         if (file && isImageFile(file)) {
-            imageData = await fileToBase64(file);
-            imagePreview = imageData;
+            try {
+                imageData = await fileToBase64(file);
+                imagePreview = imageData;
+            } catch (error) {
+                console.error('Error processing dropped image:', error);
+                toastMessage = "Failed to process image. Please try again.";
+                toastId++;
+                showToast = true;
+            }
         }
     }
 </script>

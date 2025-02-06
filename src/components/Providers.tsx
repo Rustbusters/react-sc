@@ -10,14 +10,16 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <>
       <SimulationProvider>
         <SidebarProvider>
-          <AppSidebar/>
-          <main className="w-screen h-screen flex flex-col">
-            <div className="w-full py-2 flex flex-row justify-between items-center">
-              <SidebarTrigger/>
-              <SimulationStatusIndicator/>
-            </div>
-            { children }
-          </main>
+          <div className="flex w-screen h-screen overflow-hidden">
+            <AppSidebar/>
+            <main className="flex-1 flex flex-col h-screen overflow-hidden">
+              <div className="w-full py-2 flex flex-row justify-between items-center">
+                <SidebarTrigger/>
+                <SimulationStatusIndicator/>
+              </div>
+              { children }
+            </main>
+          </div>
         </SidebarProvider>
         <Raycast/>
         <Toaster/>

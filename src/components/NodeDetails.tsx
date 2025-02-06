@@ -1,25 +1,40 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label.tsx";
-import { AlertOctagon, Copy, PlusCircle, RefreshCw, Trash2, X } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { AlertOctagon, PlusCircle, Trash2, X } from "lucide-react";
 
-interface HostStats {
-  acks_received: number;
-  acks_sent: number;
-  fragments_received: number;
-  fragments_sent: number;
-  messages_received: number;
-  messages_sent: number;
-  nacks_received: number;
-}
 
-interface DroneStats {
+type NodeInfo = {
+  node_id: number;
+  node_type: "Drone" | "Client" | "Server";
+  connections: number[];
+  metrics: DroneMetrics | HostMetrics | EmptyMetrics;
+};
+
+type DroneMetrics = {
+  category: "Drone";
+  pdr: number;
+  current_pdr: number;
   packets_sent: number;
   packets_dropped: number;
-}
+  shortcuts_used: number;
+  packet_type_counts: Record<string, number>;
+};
+
+type HostMetrics = {
+  category: "Host";
+  packets_sent: number;
+  packets_acked: number;
+  shortcuts_used: number;
+  packet_type_counts: Record<string, number>;
+  latencies: number[];
+};
+
+type EmptyMetrics = {
+  category: "None";
+};
 
 interface NodeDetailsProps {
   nodeId: string;
@@ -28,74 +43,33 @@ interface NodeDetailsProps {
 }
 
 const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
-  const [nodeType, setNodeType] = useState<string | null>(null);
-  const [neighbors, setNeighbors] = useState<string[]>([]);
-  const [pdr, setPdr] = useState<number | null>(null);
-  const [stats, setStats] = useState<HostStats | DroneStats | null>(null);
+  const [nodeData, setNodeData] = useState<NodeInfo | null>(null);
   const [newNeighbor, setNewNeighbor] = useState<string>("");
-  const [copySuccess, setCopySuccess] = useState(false);
+
+  // 📌 Funzione per recuperare i dettagli di un nodo
+  const fetchNodeDetails = useCallback(async () => {
+    try {
+      const response = await invoke<NodeInfo>("get_node_info", { nodeId: Number(nodeId) });
+      setNodeData(response);
+    } catch (error) {
+      console.error("Errore nel recupero dei dettagli:", error);
+    }
+  }, [nodeId]);
 
   useEffect(() => {
-    const fetchNodeDetails = async () => {
-      try {
-        const response = await invoke<{
-          node_id: string;
-          type: "Drone" | "Client" | "Server";
-          connections: string[];
-          pdr?: number;
-          packets_sent?: number;
-          packets_dropped?: number;
-        }>("get_node_info", { nodeId: Number(nodeId) });
-
-        setNodeType(response.type);
-        setNeighbors(response.connections.sort((a, b) => Number(a) - Number(b)));
-
-        if (response.type === "Drone") {
-          setPdr(response.pdr !== undefined ? Number(response.pdr.toFixed(2)) : null);
-          setStats({
-            packets_sent: response.packets_sent ?? 0, // TODO: aggiungerlo anche per gli host, poiché è un parametro calcolato dal SC
-            packets_dropped: response.packets_dropped ?? 0,
-          });
-        }
-
-        if (response.type === "Client" || response.type === "Server") {
-          await invoke("get_host_stats", { nodeId: Number(nodeId) });
-        }
-      } catch (error) {
-        console.error("Errore nel recupero dei dettagli:", error);
-      }
-    };
-
     fetchNodeDetails();
-  }, [nodeId]);
+    const interval = setInterval(fetchNodeDetails, 5000);
+    return () => clearInterval(interval);
+  }, [fetchNodeDetails]);
 
-  useEffect(() => {
-    const unlistenPromise = listen<[number, HostStats]>(
-      "host_stats",
-      (event) => {
-        console.log("Statistiche aggiornate:", event.payload);
-        const [receivedNodeId, hostStats] = event.payload;
-
-        if (receivedNodeId === Number(nodeId)) {
-          setStats((prev) => ({
-            ...prev,
-            ...hostStats,
-          }));
-        }
-      }
-    );
-
-    return () => {
-      unlistenPromise.then((unlisten) => unlisten());
-    };
-  }, [nodeId]);
-
-  // Aggiunta di un vicino
+  // 📌 Aggiunta di un vicino
   const addNeighbor = async () => {
-    if (!newNeighbor) return;
+    if (!newNeighbor.trim()) return;
     try {
       await invoke("add_neighbor", { nodeId: Number(nodeId), neighborId: Number(newNeighbor) });
-      setNeighbors((prev) => [...prev, newNeighbor].sort((a, b) => Number(a) - Number(b)));
+      setNodeData((prev) =>
+        prev ? { ...prev, connections: [...prev.connections, Number(newNeighbor)].sort((a, b) => a - b) } : prev
+      );
       setNewNeighbor("");
       refreshGraph();
     } catch (error) {
@@ -103,22 +77,23 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
     }
   };
 
-  // Rimozione di un vicino
-  const removeNeighbor = async (neighborId: string) => {
+  // 📌 Rimozione di un vicino
+  const removeNeighbor = async (neighborId: number) => {
     try {
-      await invoke("remove_neighbor", { nodeId: Number(nodeId), neighborId: Number(neighborId) });
-      setNeighbors((prev) => prev.filter((n) => n !== neighborId));
+      await invoke("remove_neighbor", { nodeId: Number(nodeId), neighborId });
+      setNodeData((prev) =>
+        prev ? { ...prev, connections: prev.connections.filter((n) => n !== neighborId) } : prev
+      );
       refreshGraph();
     } catch (error) {
       console.error("Errore nella rimozione del vicino:", error);
     }
   };
 
+  // 📌 Crash di un drone
   const crashNode = async () => {
     try {
-      await invoke("send_crash_command", {
-        droneId: parseInt(nodeId, 10),
-      });
+      await invoke("crash_command", { droneId: Number(nodeId) });
       alert(`Il nodo ${ nodeId } è stato crashato!`);
       refreshGraph();
       onClose();
@@ -127,14 +102,13 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
     }
   };
 
-  // Modifica del PDR (solo per i Droni)
+  // 📌 Modifica del PDR per i droni
   const updatePdr = async (newPdr: number) => {
     try {
-      await invoke("send_set_pdr_command", {
-        droneId: parseInt(nodeId, 10),
-        pdr: Math.round(newPdr * 100),
-      });
-      setPdr(newPdr);
+      await invoke("send_set_pdr_command", { droneId: Number(nodeId), pdr: Math.round(newPdr * 100) });
+      setNodeData((prev) =>
+        prev && prev.metrics.category === "Drone" ? { ...prev, metrics: { ...prev.metrics, pdr: newPdr } } : prev
+      );
     } catch (error) {
       console.error("Errore nell'aggiornamento del PDR:", error);
     }
@@ -153,39 +127,28 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
     }
   };
 
-  const copyToClipboard = async () => {
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(stats, null, 2));
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
-    } catch (error) {
-      console.error("Errore nella copia:", error);
-    }
-  };
-
+  if (!nodeData) return <p className="text-center">Caricamento...</p>;
 
   return (
     <div className="fixed right-0 top-0 h-full w-[400px] bg-white shadow-xl flex flex-col border-l border-gray-200">
-      {/* Header fisso */ }
       <div className="p-4 flex justify-between items-center border-b border-gray-200 bg-white sticky top-0">
         <h2 className="text-xl font-bold flex items-center">
           Dettagli Nodo #{ nodeId }
-          { (nodeType && <span
-              className={ `ml-3 px-2 py-1 text-sm rounded-md ${ getTypeColor(nodeType as string) }` }> { nodeType }</span>) }
+          <span className={ `ml-3 px-2 py-1 text-sm rounded-md ${ getTypeColor(nodeData.node_type) }` }>
+            { nodeData.node_type }
+          </span>
         </h2>
         <Button variant="ghost" size="icon" onClick={ onClose }>
           <X size={ 20 }/>
         </Button>
       </div>
 
-      {/* Contenuto scrollabile */ }
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {/* Vicini */ }
         <div>
           <Label className="text-gray-600">Vicini</Label>
           <div className="mt-2 space-y-2">
-            { neighbors.length > 0 ? (
-              neighbors.map((neighbor) => (
+            { nodeData.connections.length > 0 ? (
+              nodeData.connections.map((neighbor) => (
                 <div key={ neighbor } className="flex items-center justify-between bg-gray-100 px-3 py-2 rounded-md">
                   <span className="font-medium">{ neighbor }</span>
                   <Button variant="destructive" size="icon" onClick={ () => removeNeighbor(neighbor) }>
@@ -198,35 +161,21 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
             ) }
           </div>
           <div className="flex items-center mt-3 space-x-2">
-            <Input
-              type="text"
-              placeholder="ID nuovo vicino"
-              value={ newNeighbor }
-              onChange={ (e) => setNewNeighbor(e.target.value) }
-            />
+            <Input type="text" placeholder="ID nuovo vicino" value={ newNeighbor }
+                   onChange={ (e) => setNewNeighbor(e.target.value) }/>
             <Button onClick={ addNeighbor } className="flex items-center">
               <PlusCircle size={ 16 } className="mr-1"/> Aggiungi
             </Button>
           </div>
         </div>
 
-        {/* Azioni per i droni */ }
-        { nodeType === "Drone" && (
+        { nodeData.metrics.category === "Drone" && (
           <>
             <div>
               <Label className="text-gray-600">PDR (Packet Drop Rate)</Label>
               <div className="flex items-center space-x-2 mt-2">
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="1"
-                  value={ pdr ?? "" }
-                  onChange={ (e) => setPdr(parseFloat(e.target.value)) }
-                />
-                <Button onClick={ () => updatePdr(pdr ?? 0) } className="flex items-center">
-                  <RefreshCw size={ 16 } className="mr-1"/> Aggiorna
-                </Button>
+                <Input type="number" step="0.01" min="0" max="1" value={ nodeData.metrics.pdr.toFixed(2) }
+                       onChange={ (e) => updatePdr(parseFloat(e.target.value)) }/>
               </div>
             </div>
             <Button variant="destructive" onClick={ crashNode } className="w-full flex items-center justify-center">
@@ -235,25 +184,12 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
           </>
         ) }
 
-        {/* Statistiche */ }
-        { stats && (
-          <div>
-            <Label className="text-gray-600">Statistiche</Label>
-            <pre className="relative bg-gray-100 p-3 rounded-md text-sm">
-            <Button
-              variant="outline"
-              size="icon"
-              className="absolute top-0 right-0 mt-1 mr-1"
-              onClick={ copyToClipboard }
-            >
-              <Copy size={ 16 }/>
-            </Button>
-              { JSON.stringify(stats, null, 2) }
-            </pre>
-            {/* ✅ Messaggio di conferma visibile per 2 secondi */ }
-            { copySuccess && <p className="text-gray-600 text-center text-xs mt-1">Copiato negli appunti!</p> }
-          </div>
-        ) }
+        <div>
+          <Label className="text-gray-600">Statistiche</Label>
+          <pre
+            className="relative bg-gray-100 p-3 rounded-md text-sm">{ JSON.stringify(nodeData.metrics, null, 2) }
+          </pre>
+        </div>
       </div>
     </div>
   );
