@@ -34,23 +34,19 @@ pub fn add_neighbor(
     state: State<Arc<Mutex<NetworkState>>>,
     node_id: NodeId,
     neighbor_id: NodeId,
-) -> Result<(), String> {
+) -> Result<(), NetworkError> {
     let mut state = state.lock();
-    state
-        .add_neighbor(node_id, neighbor_id)
-        .map_err(|e| e.to_string())
+    state.add_neighbor(node_id, neighbor_id)
 }
-// TODO: aggiornare il grafo
+
 #[tauri::command]
 pub fn remove_neighbor(
     state: State<Arc<Mutex<NetworkState>>>,
     node_id: NodeId,
     neighbor_id: NodeId,
-) -> Result<(), String> {
+) -> Result<(), NetworkError> {
     let mut state = state.lock();
-    state
-        .remove_neighbor(node_id, neighbor_id)
-        .map_err(|e| e.to_string())
+    state.remove_neighbor(node_id, neighbor_id)
 }
 
 /// Sends a packet from a specific sender to the network.

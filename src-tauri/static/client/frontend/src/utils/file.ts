@@ -1,5 +1,5 @@
 import Compressor from 'compressorjs';
-const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
 
 export async function fileToUint8Array(file: File): Promise<Uint8Array> {
     const buffer = await file.arrayBuffer();
@@ -7,6 +7,11 @@ export async function fileToUint8Array(file: File): Promise<Uint8Array> {
 }
 
 export function compressImage(file: File): Promise<File> {
+    // Non comprimere SVG poiché sono già vettoriali
+    if (file.type === 'image/svg+xml') {
+        return Promise.resolve(file);
+    }
+
     return new Promise((resolve, reject) => {
         new Compressor(file, {
             quality: 0.8,
@@ -24,6 +29,14 @@ export function compressImage(file: File): Promise<File> {
 }
 
 export async function fileToBase64(file: File): Promise<string> {
+    // Per gli SVG, leggiamo prima il contenuto come testo
+    if (file.type === 'image/svg+xml') {
+        const text = await file.text();
+        // Convertiamo il testo SVG in base64
+        const base64 = btoa(text);
+        return `data:image/svg+xml;base64,${base64}`;
+    }
+
     if (isImageFile(file)) {
         // Log dimensione originale
         const originalBase64 = await new Promise<string>((resolve, reject) => {
@@ -47,6 +60,8 @@ export async function fileToBase64(file: File): Promise<string> {
 
         return compressedBase64;
     }
+
+    // Per altri file
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.readAsDataURL(file);

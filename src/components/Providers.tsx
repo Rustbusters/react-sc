@@ -1,9 +1,10 @@
-import { Toaster } from "react-hot-toast";
+// import { Toaster } from "react-hot-toast";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar.tsx";
 import { AppSidebar } from "@/components/AppSidebar.tsx";
 import { SimulationStatusIndicator } from "@/components/SimulationStatusIndicator.tsx";
 import { Raycast } from "@/components/CommandPalette.tsx";
 import { SimulationProvider } from "@/components/SimulationContext.tsx";
+import { Toaster } from "@/components/ui/sonner.tsx";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -22,7 +23,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           </div>
         </SidebarProvider>
         <Raycast/>
-        <Toaster/>
+        <Toaster/> {/* TODO: valutare il colore nei toast */ }
       </SimulationProvider>
     </>
   );

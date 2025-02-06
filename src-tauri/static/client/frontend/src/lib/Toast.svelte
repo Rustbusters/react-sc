@@ -34,7 +34,7 @@
 </script>
 
 {#if visible}
-    <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+    <div class="absolute top-20 left-1/2 -translate-x-1/2 z-10">
         <div class="px-4 py-2 rounded-lg shadow-lg {type === 'error' ? 'bg-red-500' : 'bg-green-500'} text-white flex items-center gap-2">
             <span>{message}</span>
             <button 

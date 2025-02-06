@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NetworkRadarStats } from "@/components/graphs/NetworkRadarChart.tsx";
 import { invoke } from "@tauri-apps/api/core";
 import { PieChart, PieData } from "@/components/graphs/PieChart.tsx";
+import { toast } from "sonner";
 
 export type DroneStats = {
   drone: string;
@@ -46,7 +47,7 @@ const NetworkStatsPage = () => {
           setDroneData(data);
         }
       } catch (error) {
-        console.error("Errore nel recupero delle statistiche:", error);
+        toast.error("Error fetching drone statistics");
       } finally {
         setLoading(false);
       }

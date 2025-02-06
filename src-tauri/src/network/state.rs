@@ -23,7 +23,7 @@ use wg_2024::network::NodeId;
 use wg_2024::packet::Packet;
 
 /// Holds adjacency information (custom graph) and per-node metadata.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct GraphState {
     /// Adjacency list: NodeId -> list of neighbors
     pub adjacency: HashMap<NodeId, Vec<NodeId>>,
@@ -68,6 +68,9 @@ pub struct NetworkState {
     /// The interval at which hosts should perform network discovery.
     pub discovery_interval: Option<Duration>,
 
+    /// If validation should be strict
+    strict_mode: bool,
+
     /// Custom adjacency graph and node metadata for the *current* network.
     pub graph: GraphState,
 
@@ -101,6 +104,7 @@ impl NetworkState {
             initial_config: None,
             status: NetworkStatus::Init,
             discovery_interval: None,
+            strict_mode: false,
             graph: GraphState::default(),
             node_threads: HashMap::new(),
             inter_node_channels: HashMap::new(),
@@ -253,7 +257,7 @@ impl NetworkState {
         trace!("Adjacency: {:?}", self.graph.adjacency);
 
         // Validate the graph
-        validate_graph(&self.graph)?;
+        validate_graph(&self.graph, true)?;
 
         debug!("Graph validated successfully");
 
@@ -357,6 +361,17 @@ impl NetworkState {
             .get_node_type(drone_id)
             .ok_or_else(|| NetworkError::NodeNotFound(drone_id.to_string()))?;
 
+        // VALIDATION
+        let mut new_graph = self.graph.clone();
+
+        new_graph.adjacency.remove(&drone_id);
+
+        for (_, adj_list) in new_graph.adjacency.iter_mut() {
+            adj_list.retain(|&id| id != drone_id);
+        }
+
+        validate_graph(&new_graph, self.strict_mode)?;
+
         let neighbors = self
             .graph
             .adjacency
@@ -441,6 +456,22 @@ impl NetworkState {
             .get_node_type(neighbor_id)
             .ok_or_else(|| NetworkError::NodeNotFound(neighbor_id.to_string()))?;
 
+        // VALIDATION
+        let mut new_graph = self.graph.clone();
+
+        new_graph
+            .adjacency
+            .entry(node_id)
+            .or_default()
+            .push(neighbor_id);
+        new_graph
+            .adjacency
+            .entry(neighbor_id)
+            .or_default()
+            .push(node_id);
+
+        validate_graph(&new_graph, self.strict_mode)?;
+
         self.send_add_sender_command(node_id, &node_type, neighbor_id)?;
         self.send_add_sender_command(neighbor_id, &neighbor_type, node_id)?;
 
@@ -512,7 +543,6 @@ impl NetworkState {
         node_id: NodeId,
         neighbor_id: NodeId,
     ) -> Result<(), NetworkError> {
-        // Un nodo non può disconnettersi da se stesso.
         if node_id == neighbor_id {
             return Err(NetworkError::InvalidOperation(
                 "Un nodo non può essere disconnesso da se stesso.".to_string(),
@@ -528,7 +558,22 @@ impl NetworkState {
             .get_node_type(neighbor_id)
             .ok_or_else(|| NetworkError::NodeNotFound(neighbor_id.to_string()))?;
 
-        // Usa il helper per inviare il comando di rimozione per entrambi i nodi.
+        // VALIDATION
+        let mut new_graph = self.graph.clone();
+
+        new_graph
+            .adjacency
+            .entry(node_id)
+            .or_default()
+            .retain(|&id| id != neighbor_id);
+        new_graph
+            .adjacency
+            .entry(neighbor_id)
+            .or_default()
+            .retain(|&id| id != node_id);
+
+        validate_graph(&new_graph, self.strict_mode)?;
+
         self.send_remove_sender_command(node_id, &node_type, neighbor_id)?;
         self.send_remove_sender_command(neighbor_id, &neighbor_type, node_id)?;
 
@@ -593,5 +638,13 @@ impl NetworkState {
 
     pub fn set_status(&mut self, status: NetworkStatus) {
         self.status = status;
+    }
+
+    pub fn get_strict_mode(&self) -> bool {
+        self.strict_mode
+    }
+
+    pub fn set_strict_mode(&mut self, strict_mode: bool) {
+        self.strict_mode = strict_mode;
     }
 }

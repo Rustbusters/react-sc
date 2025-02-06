@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { CircleUserRound, LoaderCircle, Paperclip, Send, X } from "lucide-svelte";
+    import { CircleUserRound, LoaderCircle, ImagePlus, Send, X } from "lucide-svelte";
     import { messages, serializeKey } from "../stores/store";
     import { type Message as Msg } from "../types/message";
     import { sendMessage } from "../utils/chat";
@@ -73,6 +73,15 @@
         isAtBottom = true;
         destinationId; // signal dependency
         setTimeout(scrollToBottom, 0);
+    });
+
+    // Aggiungi questo effetto dopo gli altri effetti
+    $effect(() => {
+        // Quando cambia destinationId, metti il focus sull'input
+        destinationId; // signal dependency
+        setTimeout(() => {
+            inputElement?.focus();
+        }, 0);
     });
 
     // Check if user has scrolled away from bottom
@@ -297,7 +306,7 @@
                 <img
                     src={imagePreview}
                     alt="Preview"
-                    class="max-h-48 rounded-lg {isSendingImage ? 'opacity-50' : ''}"
+                    class="max-h-48 min-h-[96px] min-w-[96px] rounded-lg {isSendingImage ? 'opacity-50' : ''} object-contain bg-gray-100 dark:bg-gray-700"
                 />
                 {#if isSendingImage}
                     <div class="absolute inset-0 flex items-center justify-center">
@@ -306,7 +315,7 @@
                 {:else}
                     <button
                         onclick={cancelImage}
-                        class="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                        class="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
                     >
                         <X class="size-4" />
                     </button>
@@ -329,7 +338,7 @@
                 class="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
                 title="Attach image"
             >
-                <Paperclip class="size-5" />
+                <ImagePlus class="size-5" />
             </button>
             <div class="relative flex-1">
                 <input

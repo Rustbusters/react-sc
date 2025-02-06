@@ -13,13 +13,15 @@ use std::collections::HashSet;
 /// # Returns
 /// - `Ok(())` if the graph is valid.
 /// - `Err(NetworkError::ValidationError)` if the graph is invalid.
-pub fn validate_graph(graph: &GraphState) -> Result<(), NetworkError> {
+pub fn validate_graph(graph: &GraphState, strict: bool) -> Result<(), NetworkError> {
     validate_connected_graph(graph)?;
     validate_bidirectionality(graph)?;
     validate_clients_and_servers(graph)?;
     validate_no_duplicate_ids(graph)?;
     validate_no_host_direct_connections(graph)?;
-    validate_network_connected_without_hosts(graph)?;
+    if strict {
+        validate_network_connected_without_hosts(graph)?;
+    }
     Ok(())
 }
 

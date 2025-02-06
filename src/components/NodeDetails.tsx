@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AlertOctagon, PlusCircle, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 
 
 type NodeInfo = {
@@ -52,7 +53,8 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
       const response = await invoke<NodeInfo>("get_node_info", { nodeId: Number(nodeId) });
       setNodeData(response);
     } catch (error) {
-      console.error("Errore nel recupero dei dettagli:", error);
+      console.log("Error fetching node details:", error);
+      toast.error("Error fetching node details");
     }
   }, [nodeId]);
 
@@ -72,8 +74,14 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
       );
       setNewNeighbor("");
       refreshGraph();
-    } catch (error) {
-      console.error("Errore nell'aggiunta del vicino:", error);
+    } catch (error: any) {
+      console.error("Error adding neighbor:", error);
+
+      if (error && error.message) {
+        toast.error(`Graph validation failed: ${ error.message }`);
+      } else {
+        toast.error("Error adding neighbor.");
+      }
     }
   };
 
@@ -85,8 +93,14 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
         prev ? { ...prev, connections: prev.connections.filter((n) => n !== neighborId) } : prev
       );
       refreshGraph();
-    } catch (error) {
-      console.error("Errore nella rimozione del vicino:", error);
+    } catch (error: any) {
+      console.error("Error removing neighbor:", error);
+
+      if (error && error.message) {
+        toast.error(`Graph validation failed: ${ error.message }`);
+      } else {
+        toast.error("Error removing neighbor.");
+      }
     }
   };
 
@@ -94,11 +108,17 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
   const crashNode = async () => {
     try {
       await invoke("crash_command", { droneId: Number(nodeId) });
-      alert(`Il nodo ${ nodeId } è stato crashato!`);
+      toast.success(`Drone ${ nodeId } crashed`);
       refreshGraph();
       onClose();
-    } catch (error) {
-      console.error("Errore nel crash del nodo:", error);
+    } catch (error: any) {
+      console.error("Error crashing drone:", error);
+
+      if (error && error.message) {
+        toast.error(`Crash failed: ${ error.message }`);
+      } else {
+        toast.error("Error crashing drone.");
+      }
     }
   };
 
@@ -110,7 +130,8 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
         prev && prev.metrics.category === "Drone" ? { ...prev, metrics: { ...prev.metrics, pdr: newPdr } } : prev
       );
     } catch (error) {
-      console.error("Errore nell'aggiornamento del PDR:", error);
+      console.error("Error updating PDR:", error);
+      toast.error("Error updating PDR");
     }
   };
 

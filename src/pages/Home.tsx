@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
+import { useSimulation } from "@/components/SimulationContext.tsx";
 
 const Home = () => {
   const navigate = useNavigate();
+  const { status, startNetwork, stopNetwork } = useSimulation();
 
   return (
     <div className="w-full h-full p-6 flex flex-col space-y-6">
@@ -51,9 +53,16 @@ const Home = () => {
           <CardContent>
             <p>Once satisfied with the network, start the simulation from the top-right menu.</p>
             <p>The simulation status is always visible in the top-right corner.</p>
-            <Button className="mt-4 w-full" variant="outline">
-              <span className={ `bg-gray-600 rounded-full w-2 h-2 inline-block mr-2` }/>
-              Init
+            <Button className="mt-4 w-full" variant="outline" onClick={ () => {
+              if (status === "Running") {
+                stopNetwork();
+              } else {
+                startNetwork();
+              }
+            } }>
+              <span
+                className={ `${ status != "Running" ? "bg-gray-600" : "bg-green-600" } rounded-full w-2 h-2 inline-block mr-2` }/>
+              { status != "Running" ? "Init" : "Running" }
             </Button>
           </CardContent>
         </Card>

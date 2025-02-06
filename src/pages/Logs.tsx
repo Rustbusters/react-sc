@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowDownToLine } from "lucide-react";
+import { toast } from "sonner";
 
 interface Message {
   id: number;
@@ -35,7 +36,8 @@ export const Logs = () => {
       });
 
       if (!Array.isArray(response)) {
-        throw new Error("Invalid response format: expected an array");
+        toast.error("Invalid response format: expected an array");
+        return;
       }
 
       if (response.length > 0) {
@@ -52,7 +54,7 @@ export const Logs = () => {
         setLastMessageId(response[response.length - 1].id);
       }
     } catch (error) {
-      console.error("Failed to fetch messages:", error);
+      toast.error("Failed to fetch messages. Please check the backend.");
       setError("Failed to fetch messages. Please check the backend.");
     }
   };
@@ -135,8 +137,6 @@ export const Logs = () => {
 
     return result;
   }, [nodeFilter, eventTypeFilter, nodeTypeFilter, messages]);
-
-  console.log("maxMessages", maxMessages);
 
   return (
     <div className="h-full overflow-hidden w-full flex flex-col p-4 pt-1 bg-background">

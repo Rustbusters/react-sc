@@ -43,7 +43,7 @@ const NetworkInfos = () => {
   if (error) return <p className="text-center text-red-500">{ error }</p>;
 
   return (
-    <div className="p-6">
+    <div className="p-2">
       <h1 className="text-2xl font-semibold mb-4">Network Infos</h1>
       <Table>
         <TableHeader>

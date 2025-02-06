@@ -239,3 +239,14 @@ pub fn get_discovery_interval(state: State<Arc<Mutex<NetworkState>>>) -> u64 {
         .map(|d| d.as_secs())
         .unwrap_or(0)
 }
+
+#[tauri::command]
+pub fn get_strict_mode(state: State<Arc<Mutex<NetworkState>>>) -> bool {
+    state.lock().get_strict_mode()
+}
+
+#[tauri::command]
+pub fn set_strict_mode(state: State<Arc<Mutex<NetworkState>>>, strict: bool) -> Result<(), String> {
+    state.lock().set_strict_mode(strict);
+    Ok(())
+}

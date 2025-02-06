@@ -9,8 +9,8 @@ use crate::commands::{
     get_all_drones_statistics, get_config, get_default_configs, get_default_configs_dir,
     get_discovery_interval, get_drone_statistics, get_global_statistics, get_graph,
     get_history_configs, get_history_dir, get_host_stats, get_network_infos, get_network_status,
-    get_new_messages, get_node_info, load_config, remove_neighbor, send_packet,
-    send_set_pdr_command, set_discovery_interval, start_network, stop_network,
+    get_new_messages, get_node_info, get_strict_mode, load_config, remove_neighbor, send_packet,
+    send_set_pdr_command, set_discovery_interval, set_strict_mode, start_network, stop_network,
 };
 use crate::listener::Listener;
 use crate::network::state::NetworkState;
@@ -69,6 +69,8 @@ pub fn run() {
             config_remove_node,
             set_discovery_interval,
             get_discovery_interval,
+            set_strict_mode,
+            get_strict_mode,
             // network commands
             start_network,
             stop_network,

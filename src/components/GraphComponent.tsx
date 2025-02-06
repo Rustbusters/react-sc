@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import cytoscape from "cytoscape";
 import { invoke } from "@tauri-apps/api/core";
-import { MousePointerClick, RefreshCcw } from "lucide-react";
+import { RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSimulation } from "@/components/SimulationContext.tsx";
+import { toast } from "sonner";
 
 interface GraphComponentProps {
   onNodeSelect: (nodeId: string | null) => void;
@@ -14,6 +15,8 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
   const cyRef = useRef<HTMLDivElement>(null);
   const [cy, setCy] = useState<cytoscape.Core | null>(null);
   const { status } = useSimulation();
+  const [_zoomLevel, setZoomLevel] = useState(1);
+
 
   const saveGraphLayout = () => {
     if (!cy) return;
@@ -116,10 +119,11 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
       }
     } catch (error) {
       console.error("Failed to load graph data:", error);
+      toast.error("Failed to load graph data");
     }
   }, [cy]);
 
-  // Inizializzazione del grafo
+  // Initialization of the graph
   useEffect(() => {
     if (!cyRef.current) return;
 
@@ -307,6 +311,21 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
   useEffect(() => {
     if (!cy) return;
 
+    const updateZoom = () => {
+      setZoomLevel(cy.zoom());
+    };
+
+    cy.on("zoom", updateZoom);
+
+    return () => {
+      cy.off("zoom", updateZoom);
+    };
+  }, [cy]);
+
+
+  useEffect(() => {
+    if (!cy) return;
+
     const handleSelect = (event: cytoscape.EventObject) => {
       const nodeId = event.target.id();
       console.log("Nodo selezionato:", nodeId);
@@ -333,26 +352,27 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
   }, [loadGraphData, setRefreshGraph]);
 
   return (
-    <div className="relative flex flex-col h-full w-full min-w-0 overflow-hidden">
-      {/* Bottone posizionato in alto a destra */ }
+    <div className="relative flex flex-col h-full w-full min-w-0 overflow-hidden rounded-lg">
+      <div
+        ref={ cyRef }
+        className="flex-grow w-full h-full rounded-lg"
+        /*style={ {
+          backgroundColor: "white",
+          backgroundImage: "radial-gradient(circle, rgba(0, 0, 0, 0.3) 1px, transparent 1px)",
+          backgroundSize: `${ Math.min(100, Math.max(20, 10 * zoomLevel)) }px ${ Math.min(100, Math.max(20, 10 * zoomLevel)) }px`, // Scala con lo zoom
+          backgroundPosition: "center",
+        } }*/
+      />
+
       <Button
         onClick={ () => {
           saveGraphLayout();
           loadGraphData();
         } }
-        className="absolute top-4 right-4 z-10 p-2 aspect-square bg-blue-500 text-white rounded-md hover:bg-blue-600 focus:outline-none"
+        className="absolute bottom-4 right-4 z-10 p-2 aspect-square"
       >
         <RefreshCcw className="w-5 h-5"/>
       </Button>
-
-      <div
-        ref={ cyRef }
-        className="flex-grow w-full h-full rounded-lg"
-      />
-      <div className="w-full flex flex-row items-center justify-center gap-2 pb-2">
-        <MousePointerClick className="w-5 h-5"/>
-        <p className="text-center text-gray-700 font-semibold">Click on nodes</p>
-      </div>
     </div>
   );
 };

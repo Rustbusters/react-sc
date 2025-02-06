@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner"
 import { join } from "@tauri-apps/api/path";
 import { exists, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { CircleCheck, File, FolderOpen, Trash, Upload } from "lucide-react";
 import { useSimulation } from "@/components/SimulationContext";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
+import { Switch } from "@/components/ui/switch.tsx";
 
 const LAST_CONFIG_FILE = "last_config.txt";
 
@@ -31,6 +32,8 @@ const Settings = () => {
   const [discoveryInterval, setDiscoveryInterval] = useState<number>(0);
 
   const [discoveryIntervalSent, setDiscoveryIntervalSent] = useState<boolean>(true);
+
+  const [strict, setStrict] = useState<boolean>(false);
 
   const getLastConfigFilePath = async (): Promise<string> => {
     const historyDir = await invoke<string>("get_history_dir");
@@ -93,6 +96,7 @@ const Settings = () => {
       await writeTextFile(filePath, path);
     } catch (error) {
       console.error("Error saving configuration:", error);
+      toast.warning("Failed to save configuration.");
     }
   };
 
@@ -148,7 +152,7 @@ const Settings = () => {
   }, [maxMessages]);
 
   useEffect(() => {
-    const fetchDiscoveryInterval = async () => {
+    const fetchSettings = async () => {
       try {
         const interval = await invoke<number>("get_discovery_interval");
         setDiscoveryInterval(interval);
@@ -156,10 +160,31 @@ const Settings = () => {
         console.error("Failed to fetch discovery interval:", error);
         toast.error("Error fetching discovery interval.");
       }
+
+      try {
+        const strictMode = await invoke<boolean>("get_strict_mode");
+        setStrict(strictMode);
+      } catch (error) {
+        console.error("Failed to fetch strict mode:", error);
+        toast.error("Error fetching strict mode.");
+      }
     };
 
-    fetchDiscoveryInterval();
-  }, []); // Run only on mount
+    fetchSettings();
+  }, []);
+
+
+  const toggleStrictMode = async () => {
+    try {
+      await invoke("set_strict_mode", { strict: !strict });
+      setStrict(!strict);
+      toast.success(`Strict Mode ${ !strict ? "enabled" : "disabled" }!`);
+    } catch (error) {
+      console.error("Error updating Strict Mode:", error);
+      toast.error("Failed to update Strict Mode.");
+    }
+  };
+
 
   return (
     <div className="p-6 max-w-3xl mx-auto grid grid-cols-3 gap-4">
@@ -243,7 +268,7 @@ const Settings = () => {
       </div>
 
       {/* Discovery Interval Setting */ }
-      <div className=" space-y-2">
+      <div className="space-y-2">
         <Label htmlFor="discoveryInterval">Discovery Interval (seconds)</Label>
         <div className="flex flex-row gap-2">
           <Input
@@ -275,6 +300,11 @@ const Settings = () => {
             <CircleCheck/>
           </Button>
         </div>
+      </div>
+
+      <div className="flex flex-col items-center justify-around">
+        <Label htmlFor="strictMode">Strict Mode in Validation</Label>
+        <Switch id="strictMode" checked={ strict } onCheckedChange={ toggleStrictMode }/>
       </div>
     </div>
   );
