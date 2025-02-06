@@ -8,6 +8,7 @@ import { exists, readTextFile, writeTextFile } from "@tauri-apps/plugin-fs";
 import { File, FolderOpen, Trash, Upload } from "lucide-react";
 import { useSimulation } from "@/components/SimulationContext";
 import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
 
 const LAST_CONFIG_FILE = "last_config.txt";
 
@@ -24,6 +25,8 @@ const Settings = () => {
   const [historyConfigs, setHistoryConfigs] = useState<ConfigFile[]>([]);
   const [configPath, setConfigPath] = useState<string>("");
   const [alreadyLoaded, setAlreadyLoaded] = useState<boolean>(false);
+
+  const [maxMessages, setMaxMessages] = useState<number>(parseInt(localStorage.getItem("maxMessages") || "1000", 10));
 
   const getLastConfigFilePath = async (): Promise<string> => {
     const historyDir = await invoke<string>("get_history_dir");
@@ -135,6 +138,11 @@ const Settings = () => {
     }
   };
 
+  useEffect(() => {
+    localStorage.setItem("maxMessages", maxMessages.toString());
+    window.dispatchEvent(new Event("storage"));
+  }, [maxMessages]);
+
   return (
     <div className="p-6 max-w-3xl mx-auto grid grid-cols-3 gap-4">
       <div className="col-span-1 border-r pr-4">
@@ -174,7 +182,7 @@ const Settings = () => {
 
         {/* Cronologia */ }
         <h2 className="text-lg font-semibold mt-6 mb-2">Cronologia</h2>
-        <div className="space-y-2">
+        <div className="space-y-2 max-h-72 overflow-y-auto">
           { historyConfigs.map((config) => (
             <div key={ config.id }
                  className="flex justify-between items-center p-3 border rounded-lg shadow-sm bg-white">
@@ -195,6 +203,25 @@ const Settings = () => {
             </div>
           )) }
         </div>
+      </div>
+
+      {/* Max Messages Setting */ }
+      <div className="space-y-2">
+        <Label htmlFor="maxMessages">Max Log Messages</Label>
+        <Input
+          id="maxMessages"
+          type="number"
+          value={ maxMessages }
+          onChange={ (e) => {
+            const value = parseInt(e.target.value, 10);
+            if (value > 0) {
+              setMaxMessages(value);
+            } else {
+              toast.error("Value must be greater than 0");
+            }
+          } }
+          className="w-full"
+        />
       </div>
     </div>
   );

@@ -90,70 +90,94 @@ pub fn get_global_statistics(state: State<Arc<Mutex<NetworkState>>>) -> Value {
     })
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub enum EventType {
+    PacketSent,
+    PacketDropped,
+    ControllerShortcut,
+    HostMessageSent,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Message {
+    pub id: usize,
+    pub event_type: EventType,
+    pub node: NodeId,
+    pub node_type: String, // New field: "Host" or "Drone"
+    pub packet: String,
+}
+
 #[tauri::command]
 pub fn get_new_messages(
     state: State<Arc<Mutex<NetworkState>>>,
     last_id: usize,
     max_messages: usize,
-) -> Value {
+) -> Vec<Message> {
     let state = state.lock();
     let total_messages = state.received_messages.len();
-
-    // Calcoliamo il punto di inizio senza scorrere tutta la lista
     let start_index = total_messages.saturating_sub(max_messages).max(last_id);
 
-    // Estraiamo solo i messaggi rilevanti con ID basato sull'indice
-    let messages: Vec<Value> = state.received_messages[start_index..]
+    state.received_messages[start_index..]
         .iter()
         .enumerate()
         .map(|(idx, event)| {
             let message_id = start_index + idx;
             match event {
-                ControllerEvent::Drone { node_id, event } => match event {
-                    DroneEvent::PacketSent(packet) => json!({
-                        "id": message_id,
-                        "type": "DroneEvent::PacketSent",
-                        "node": node_id,
-                        "packet": format!("{:?}", packet)
-                    }),
-                    DroneEvent::PacketDropped(packet) => json!({
-                        "id": message_id,
-                        "type": "DroneEvent::PacketDropped",
-                        "node": node_id,
-                        "packet": format!("{:?}", packet)
-                    }),
-                    DroneEvent::ControllerShortcut(packet) => json!({
-                        "id": message_id,
-                        "type": "DroneEvent::ControllerShortcut",
-                        "node": node_id,
-                        "packet": format!("{:?}", packet)
-                    }),
-                },
-                ControllerEvent::Host { node_id, event } => match event {
-                    HostEvent::HostMessageSent(destination, message, duration) => json!({
-                        "id": message_id,
-                        "type": "HostEvent::HostMessageSent",
-                        "node": node_id,
-                        "message": format!("{:?}", message)
-                    }),
-                    HostEvent::PacketSent(packet_header) => json!({
-                        "id": message_id,
-                        "type": "HostEvent::PacketSent",
-                        "node": node_id,
-                        "packet": format!("{:?}", packet_header)
-                    }),
-                    HostEvent::ControllerShortcut(packet) => json!({
-                        "id": message_id,
-                        "type": "HostEvent::ControllerShortcut",
-                        "node": node_id,
-                        "packet": format!("{:?}", packet)
-                    }),
-                },
+                ControllerEvent::Drone { node_id, event } => {
+                    let node_type = "Drone".to_string();
+                    match event {
+                        DroneEvent::PacketSent(packet) => Message {
+                            id: message_id,
+                            event_type: EventType::PacketSent,
+                            node: *node_id,
+                            node_type,
+                            packet: format!("{:?}", packet),
+                        },
+                        DroneEvent::PacketDropped(packet) => Message {
+                            id: message_id,
+                            event_type: EventType::PacketDropped,
+                            node: *node_id,
+                            node_type,
+                            packet: format!("{:?}", packet),
+                        },
+                        DroneEvent::ControllerShortcut(packet) => Message {
+                            id: message_id,
+                            event_type: EventType::ControllerShortcut,
+                            node: *node_id,
+                            node_type,
+                            packet: format!("{:?}", packet),
+                        },
+                    }
+                }
+                ControllerEvent::Host { node_id, event } => {
+                    let node_type = "Host".to_string();
+                    match event {
+                        HostEvent::HostMessageSent(_, message, _) => Message {
+                            id: message_id,
+                            event_type: EventType::HostMessageSent,
+                            node: *node_id,
+                            node_type,
+                            packet: format!("{:?}", message),
+                        },
+                        HostEvent::PacketSent(packet_header) => Message {
+                            id: message_id,
+                            event_type: EventType::PacketSent, // Renamed from HostPacketSent
+                            node: *node_id,
+                            node_type,
+                            packet: format!("{:?}", packet_header),
+                        },
+                        HostEvent::ControllerShortcut(packet) => Message {
+                            id: message_id,
+                            event_type: EventType::ControllerShortcut,
+                            node: *node_id,
+                            node_type,
+                            packet: format!("{:?}", packet),
+                        },
+                    }
+                }
             }
         })
-        .collect();
-
-    json!({ "messages": messages })
+        .collect()
 }
 
 #[tauri::command]

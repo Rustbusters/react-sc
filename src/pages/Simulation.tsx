@@ -24,11 +24,9 @@ const Simulation = () => {
         </div>
       </div>
 
-      {/* Sheet di ShadCN */ }
       <Sheet open={ isSheetOpen } onOpenChange={ (open) => !open && setSelectedNode(null) }>
         <SheetContent>
           <SheetHeader>
-            {/*<SheetTitle> Dettagli del Nodo </SheetTitle>*/ }
           </SheetHeader>
           { selectedNode && <NodeDetails nodeId={ selectedNode } onClose={ () => setSelectedNode(null) }
                                          refreshGraph={ refreshGraph }/> }

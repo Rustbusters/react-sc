@@ -27,9 +27,6 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
   const isGraphDifferent = (newElements: any[]) => {
     if (!cy) return true;
     const currentElements = cy.elements().jsons();
-    console.log("Current elements:", currentElements);
-    console.log("New elements:", newElements);
-    console.log("Diff:", JSON.stringify(currentElements) !== JSON.stringify(newElements));
     return JSON.stringify(currentElements) !== JSON.stringify(newElements);
   };
 
@@ -101,12 +98,12 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
         });
       });
 
-      // Confronta il grafo attuale con il nuovo per evitare reload inutili
+      // Check if the graph is different from the current one
       if (isGraphDifferent(elements)) {
         cy.elements().remove();
         cy.add(elements);
 
-        // Ripristina la disposizione salvata dei nodi
+        // Restore the saved layout
         const savedLayout = sessionStorage.getItem("graph_layout");
         if (savedLayout) {
           const positions = JSON.parse(savedLayout);
