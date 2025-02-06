@@ -14,7 +14,7 @@ const Simulation = () => {
   const isSheetOpen = !!selectedNode && status === "Running";
 
   return (
-    <div className="flex flex-col w-full h-full">
+    <div className="flex flex-col w-full h-full select-none">
       <div className="flex flex-1">
         <div className="w-1/2 h-full">
           <GraphComponent onNodeSelect={ setSelectedNode } setRefreshGraph={ setRefreshGraph }/>

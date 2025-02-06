@@ -141,11 +141,12 @@ export const Logs = () => {
   return (
     <div className="h-full overflow-hidden w-full flex flex-col p-4 pt-1 bg-background">
       {/* Header and Filters */ }
-      <div className="flex items-center justify-between pb-2 border-b">
+      <div className="flex items-center justify-between pb-2 border-b gap-4">
         <h2 className="text-2xl font-semibold">Logs</h2>
 
         {/* Filters */ }
-        <div className="flex items-center gap-4">
+        <div
+          className="flex-1 flex items-center justify-end gap-4 overflow-x-auto whitespace-nowrap flex-nowrap scrollbar-hide select-none">
           {/* Node Filter */ }
           <div className="flex items-center gap-2">
             <Label htmlFor="nodeFilter" className="text-muted-foreground text-sm">Filter by Node:</Label>

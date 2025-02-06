@@ -8,7 +8,7 @@ const Home = () => {
   const { status, startNetwork, stopNetwork } = useSimulation();
 
   return (
-    <div className="w-full h-full p-6 flex flex-col space-y-6">
+    <div className="w-full h-full p-6 flex flex-col space-y-6 select-none">
       {/* Title */ }
       <h1 className="text-3xl font-bold">🏠 Simulation Controller</h1>
       <p className="text-muted-foreground">
@@ -94,6 +94,21 @@ const Home = () => {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Step 6: Send Messages */ }
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle>📡 Packet Transmission</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Send custom packets across the network with custom paths.</p>
+            <p>You can also schedule periodic sending on a separate thread.</p>
+            <Button onClick={ () => navigate("/send") } className="mt-4 w-full">
+              Go to Packet Sender
+            </Button>
+          </CardContent>
+        </Card>
+
       </div>
     </div>
   );

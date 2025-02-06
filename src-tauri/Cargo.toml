@@ -36,7 +36,7 @@ client = { git = "https://github.com/Rustbusters/client.git" }
 #client = { path = "../../client" }
 server = { git = "https://github.com/Rustbusters/server.git" }
 #server = { path = "../../server" }
-common-utils = { git = "https://github.com/Rustbusters/common-utils.git", branch = "feature/new-stats" }
+common-utils = { git = "https://github.com/Rustbusters/common-utils.git" }
 rusty_drones = { git = "https://github.com/rusty-drone-2024/rusty-drone.git" }
 lockheedrustin-drone = { git = "https://github.com/Lockheed-Rustin/drone.git" }
 
@@ -46,3 +46,4 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 uuid = "1.12.1"
 chrono = "0.4.39"
+rand = "0.8.5"

@@ -10,13 +10,15 @@ use crate::commands::{
     get_discovery_interval, get_drone_statistics, get_global_statistics, get_graph,
     get_history_configs, get_history_dir, get_host_stats, get_network_infos, get_network_status,
     get_new_messages, get_node_info, get_strict_mode, load_config, remove_neighbor, send_packet,
-    send_set_pdr_command, set_discovery_interval, set_strict_mode, start_network, stop_network,
+    send_set_pdr_command, set_discovery_interval, set_strict_mode, start_network,
+    start_repeated_sending, stop_network, stop_repeated_sending,
 };
 use crate::listener::Listener;
 use crate::network::state::NetworkState;
 
 use dotenv::dotenv;
 use parking_lot::Mutex;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -56,6 +58,7 @@ pub fn run() {
             }
         })
         .manage(state)
+        .manage(Arc::new(Mutex::new(None::<Arc<AtomicBool>>)))
         .invoke_handler(tauri::generate_handler![
             // config commands
             load_config,
@@ -78,10 +81,12 @@ pub fn run() {
             // simulation commands
             crash_command,
             send_set_pdr_command,
-            send_packet,
             remove_neighbor,
             add_neighbor,
             get_graph,
+            start_repeated_sending,
+            stop_repeated_sending,
+            send_packet,
             // stats
             get_drone_statistics,
             get_all_drones_statistics,

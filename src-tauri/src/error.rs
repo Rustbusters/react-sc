@@ -49,6 +49,9 @@ pub enum NetworkError {
 
     #[error("Invalid operation: {0}")]
     InvalidOperation(String),
+
+    #[error("Generic error: {0}")]
+    Other(String),
 }
 
 impl Serialize for NetworkError {

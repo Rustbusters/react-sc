@@ -19,7 +19,7 @@ export const SimulationStatusIndicator = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="mx-2">
+        <Button variant="ghost" className="mx-2 select-none">
           { isLoading ? (
             <span className="text-gray-500">Caricamento...</span>
           ) : (

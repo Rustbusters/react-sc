@@ -1,6 +1,7 @@
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -9,7 +10,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { ChartLine, Logs, Play, Search, Send, Settings } from "lucide-react";
+import { ChartLine, Logs, Play, Send, Settings } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
 const items = [
@@ -17,7 +18,6 @@ const items = [
   { title: "Logs", url: "/logs", icon: Logs },
   { title: "Stats", url: "/stats", icon: ChartLine },
   { title: "Send", url: "/send", icon: Send },
-  { title: "Search", url: "#", icon: Search },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
@@ -60,6 +60,15 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="relative">
+        <p
+          className={ `text-center text-sm overflow-hidden transition-opacity duration-500 ease-in ${
+            state === "expanded" ? "opacity-100 max-h-20" : "opacity-0 max-h-0 delay-0"
+          }` }
+        >
+          Advanced Programming Course 2024-2025 UNITN
+        </p>
+      </SidebarFooter>
     </Sidebar>
   );
 }
