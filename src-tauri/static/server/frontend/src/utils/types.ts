@@ -46,8 +46,14 @@ export type ChartDataType = {
     datasets: { label: string, data: number[], backgroundColor: string[], hoverBackgroundColor: string[], }[];
 }
 
+export enum ChartType {
+    Pie = "PIE",
+    Bar = "BAR",
+}
+
 export type ChartProps = {
-    stats: StatsType
+    stats: StatsType,
+    type: ChartType,
 }
 
 // Server messages

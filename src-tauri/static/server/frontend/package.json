@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@material-tailwind/react": "^2.1.10",
     "@popperjs/core": "^2.11.8",
     "@preline/dropdown": "^2.5.2",
     "axios": "^1.7.9",

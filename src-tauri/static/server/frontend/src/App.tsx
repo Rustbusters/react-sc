@@ -24,18 +24,6 @@ const App: React.FC<AppProps> = () => {
 
   // Server messages
   let [serversMessages, setServersMessages] = useState<ServerMessages>(new Map());
-  serversMessages.set(0, [
-    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
-    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
-    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
-    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
-    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
-    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
-    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
-    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
-    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
-  ]);
-
   // List of active users on each server
   let [serverActiveUsers, setActiveUsers] = useState<ServerActiveUsers>(new Map());
 

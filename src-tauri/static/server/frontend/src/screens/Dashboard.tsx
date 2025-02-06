@@ -1,9 +1,8 @@
 import React, { Fragment, useContext, useEffect, useState } from 'react';
-import PieChart from "../components/PieChart"
-import BarChart from "../components/BarChart"
+import Chart from "../components/Chart"
 
 import { GlobalStateContext } from '../GlobalState';
-import { defaultStats, StatsType } from '../utils/types';
+import { ChartType, defaultStats, StatsType } from '../utils/types';
 import Title from '../components/common/Title';
 
 
@@ -51,8 +50,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
                     <div className="py-6">
                         {combinedStats ? <div className="flex flex-col space-y-8">
-                            <PieChart stats={combinedStats} />
-                            <BarChart stats={combinedStats} />
+                            <Chart stats={combinedStats} type={ChartType.Pie} />
+                            <Chart stats={combinedStats} type={ChartType.Bar} />
                         </div> : <div className="w-full h-full text-slate-500">
                             No data to display</div>}
                     </div>
