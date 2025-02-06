@@ -2,7 +2,7 @@ import Title from "../components/common/Title";
 
 const Documentation = () => {
     return (
-        <div className="p-8 flex flex-1 bg-gray-50">
+        <div className="p-8 flex flex-1 bg-gray-50 dark:bg-black">
             <div className="flex flex-col flex-1">
                 <main>
                     <Title title="Documentation" label="This page is shows some additional information on how the server's architecture was structured." />

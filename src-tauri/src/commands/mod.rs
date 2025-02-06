@@ -9,7 +9,7 @@ pub use config::{
 };
 pub use network::{get_network_status, start_network, stop_network};
 pub use simulation::{
-    add_neighbor, get_graph, remove_neighbor, send_crash_command, send_packet, send_set_pdr_command,
+    add_neighbor, get_graph, remove_neighbor, crash_command, send_packet, send_set_pdr_command,
 };
 pub use stats::{
     get_all_drones_statistics, get_drone_statistics, get_global_statistics, get_host_stats,

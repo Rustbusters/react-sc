@@ -1,29 +1,42 @@
 
 export type StatsType = {
-    messagesSent: number,
-    fragmentsSent: number,
+    messagesSent: number;
+    messagesReceived: number;
 
-    messagesReceived: number,
-    fragmentsReceived: number,
+    messageFragmentsSent: number;
+    messageFragmentsReceived: number;
 
-    acksSent: number,
-    acksReceived: number,
+    floodRequestsSent: number;
+    floodRequestsReceived: number;
 
-    nacksReceived: number,
-}
+    floodResponsesSent: number;
+    floodResponsesReceived: number;
 
-export const defaultStats = {
+    acksSent: number;
+    acksReceived: number;
+
+    nacksReceived: number;
+};
+
+export const defaultStats: StatsType = {
     messagesSent: 0,
-    fragmentsSent: 0,
-
     messagesReceived: 0,
-    fragmentsReceived: 0,
+
+    messageFragmentsSent: 0,
+    messageFragmentsReceived: 0,
+
+    floodRequestsSent: 0,
+    floodRequestsReceived: 0,
+
+    floodResponsesSent: 0,
+    floodResponsesReceived: 0,
 
     acksSent: 0,
     acksReceived: 0,
 
     nacksReceived: 0,
-}
+};
+
 
 export type ServerStats = Map<number, StatsType>;
 

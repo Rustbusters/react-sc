@@ -194,7 +194,7 @@ export function Raycast() {
           });
           break;
         case "crash_drone":
-          await invoke("send_crash_command", {
+          await invoke("crash_command", {
             droneId: parseInt(data.drone_id, 10),
           });
           break;

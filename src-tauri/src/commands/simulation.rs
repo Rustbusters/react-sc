@@ -1,3 +1,4 @@
+use crate::error::NetworkError;
 use crate::network::state::{NetworkState, NodeType};
 use log::{debug, error, info};
 use parking_lot::Mutex;
@@ -9,12 +10,12 @@ use wg_2024::network::{NodeId, SourceRoutingHeader};
 use wg_2024::packet::{Fragment, Packet};
 
 /// Sends a "Crash" command to a specific drone.
-/// This calls `send_crash_command` on `NetworkState`.
+/// This calls `crash_command` on `NetworkState`.
 #[tauri::command]
-pub fn send_crash_command(
+pub fn crash_command(
     state: State<Arc<Mutex<NetworkState>>>,
     drone_id: u32,
-) -> Result<(), String> {
+) -> Result<(), NetworkError> {
     state.lock().send_crash_command(drone_id as NodeId)
 }
 

@@ -25,8 +25,16 @@ const App: React.FC<AppProps> = () => {
   // Server messages
   let [serversMessages, setServersMessages] = useState<ServerMessages>(new Map());
   serversMessages.set(0, [
-    { id: "ajskdjasksjdkajkldjdkajdsljkadsljdlkjdaklsjd", srcId: "0", destId: "1", message: "Hellelloelloelloo World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World o World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World Hello World " },
-  ])
+    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
+    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
+    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
+    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
+    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
+    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
+    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
+    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
+    { id: "askdajsdklj-123128-ajskdjask", srcId: "0", destId: "0", message: "Hello World" },
+  ]);
 
   // List of active users on each server
   let [serverActiveUsers, setActiveUsers] = useState<ServerActiveUsers>(new Map());
@@ -35,10 +43,16 @@ const App: React.FC<AppProps> = () => {
     // Validate stats structure
     const newStats: StatsType = {
       messagesSent: stats["messages_sent"],
-      fragmentsSent: stats["fragments_sent"],
-
       messagesReceived: stats["messages_received"],
-      fragmentsReceived: stats["fragments_received"],
+
+      messageFragmentsSent: stats["message_fragments_sent"],
+      messageFragmentsReceived: stats["message_fragments_received"],
+
+      floodRequestsSent: stats["flood_requests_sent"],
+      floodRequestsReceived: stats["flood_requests_received"],
+
+      floodResponsesSent: stats["flood_responses_sent"],
+      floodResponsesReceived: stats["flood_responses_received"],
 
       acksSent: stats["acks_sent"],
       acksReceived: stats["acks_received"],

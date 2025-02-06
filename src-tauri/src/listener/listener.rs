@@ -1,7 +1,6 @@
 use crate::network::state::NetworkState;
 use crate::utils::ControllerEvent;
 use common_utils::HostEvent;
-use crossbeam_channel::Receiver;
 use log::{debug, error, info};
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -94,7 +93,7 @@ impl Listener {
                 PacketType::Ack(_) | PacketType::Nack(_) | PacketType::FloodResponse(_) => {
                     state.metrics.update_drone_packet_sent(node_id, &packet);
                     if let Some(drone_metric) = state.metrics.drone_metrics.get_mut(&node_id) {
-                        drone_metric.shortcuts += 1;
+                        drone_metric.record_shortcut();
                     }
                     drop(state); // TODO: check this
                     self.send_packet_to_destination(packet);
@@ -125,6 +124,9 @@ impl Listener {
             }
             HostEvent::ControllerShortcut(packet) => match packet.pack_type {
                 PacketType::Ack(_) | PacketType::Nack(_) | PacketType::FloodResponse(_) => {
+                    if let Some(host_metric) = state.metrics.host_metrics.get_mut(&node_id) {
+                        host_metric.record_shortcut();
+                    }
                     self.send_packet_to_destination(packet);
                 }
                 _ => {

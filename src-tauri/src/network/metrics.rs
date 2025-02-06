@@ -41,15 +41,6 @@ impl From<&PacketTypeHeader> for PacketTypeLabel {
 
 // =============================================================================
 #[derive(Debug, Clone)]
-pub struct PacketEvent {
-    pub timestamp: u64,
-    pub packet_type: PacketTypeLabel,
-    /// Indica se l'evento rappresenta un drop (da un nack "dropped")
-    pub dropped: bool,
-}
-
-// =============================================================================
-#[derive(Debug, Clone)]
 pub struct MetricsTimePoint {
     pub timestamp: u64,
     pub sent: u64,
@@ -62,7 +53,7 @@ pub struct DroneMetrics {
     /// Number of packets dropped by the drone
     pub drops: u64,
 
-    pub current_pdr: f32, // FIXME: credo sia in scala 0-100
+    pub current_pdr: f32,
 
     /// Number of shortcuts used by the drone
     pub shortcuts: u64,
@@ -86,7 +77,7 @@ impl DroneMetrics {
     }
 
     pub fn update_pdr(&mut self, successful: bool) {
-        self.current_pdr = self.current_pdr * 0.99 + if successful { 1.0 } else { 0.0 };
+        self.current_pdr = self.current_pdr * 0.99 + if successful { 0.01 } else { 0.0 };
 
         let sent = self.number_of_msg_fragments_sent();
         let dropped = self.drops;
@@ -108,6 +99,10 @@ impl DroneMetrics {
             self.update_pdr(true);
         }
     }
+
+    pub fn record_shortcut(&mut self) {
+        self.shortcuts += 1;
+    }
 }
 
 // =============================================================================
@@ -116,7 +111,7 @@ impl DroneMetrics {
 
 #[derive(Debug, Default)]
 pub struct HostMetrics {
-    /// For each destination: (sent, acked) // TODO: aggiornare gli ack guardando i droni vicini
+    /// For each destination: (sent, acked)
     pub dest_stats: HashMap<NodeId, (u64, u64)>,
     /// Number of shortcuts used by the host
     pub shortcuts: u64,
@@ -135,13 +130,13 @@ impl HostMetrics {
         *self.packet_type_counts.entry(packet_type).or_insert(0) += 1;
     }
 
-    /// Registra il ricevimento di un ack da una specifica destinazione.
+    /// Record an ack received by the host from another host.
     pub fn record_ack(&mut self, src: NodeId) {
         let entry = self.dest_stats.entry(src).or_insert((0, 0));
         entry.1 += 1;
     }
 
-    /// Registra l'uso di uno shortcut.
+    /// Record a shortcut used by the host.
     pub fn record_shortcut(&mut self) {
         self.shortcuts += 1;
     }
@@ -149,6 +144,10 @@ impl HostMetrics {
     /// Record the latency for a message sent by the host.
     pub fn record_latency(&mut self, latency: Duration) {
         self.latencies.push(latency);
+    }
+
+    pub fn number_of_packets_sent(&self) -> u64 {
+        self.packet_type_counts.values().sum()
     }
 }
 
@@ -195,9 +194,16 @@ impl Metrics {
 
         // Update the global heatmap
         if packet_type == PacketTypeLabel::MsgFragment {
-            if let Some(destination) = packet.routing_header.next_hop() {
-                // TODO: controllare cosa mi ritorna ogni drone
-                self.update_global_heatmap(node_id, destination);
+            if let Some(current_hop) = packet.routing_header.current_hop() {
+                self.update_global_heatmap(node_id, current_hop);
+            }
+        } else if packet_type == PacketTypeLabel::Ack && packet.routing_header.is_last_hop() {
+            if let Some(destination) = packet.routing_header.destination() {
+                if let Some(metrics) = self.host_metrics.get_mut(&destination) {
+                    if let Some(source) = packet.routing_header.source() {
+                        metrics.record_ack(source);
+                    }
+                }
             }
         }
     }

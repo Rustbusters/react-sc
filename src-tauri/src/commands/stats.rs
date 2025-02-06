@@ -184,11 +184,22 @@ pub fn get_network_infos(state: State<Arc<Mutex<NetworkState>>>) -> Value {
         });
 
         if let NodeType::Drone = metadata.node_type {
+            node_data["pdr"] = json!(metadata.pdr);
+
             if let Some(metrics) = state.metrics.drone_metrics.get(&node_id) {
-                node_data["pdr"] = json!(metrics.current_pdr);
+                node_data["current_pdr"] = json!(metrics.current_pdr);
                 node_data["packets_sent"] = json!(metrics.number_of_packets_sent());
                 node_data["packets_dropped"] = json!(metrics.drops);
+                node_data["shortcuts"] = json!(metrics.shortcuts);
             }
+        } else if let Some(metrics) = state.metrics.host_metrics.get(&node_id) {
+            node_data["packets_sent"] = json!(metrics.number_of_packets_sent()); // TODO: pacchetti inviati, non MsgFragment inviati
+            node_data["packets_acked"] = json!(metrics
+                .dest_stats
+                .values()
+                .map(|(_, acked)| acked)
+                .sum::<u64>());
+            node_data["shortcuts"] = json!(metrics.shortcuts);
         }
 
         nodes_info.push(node_data);
@@ -197,40 +208,102 @@ pub fn get_network_infos(state: State<Arc<Mutex<NetworkState>>>) -> Value {
     json!({ "nodes": nodes_info })
 }
 
+use crate::network::metrics::PacketTypeLabel;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+pub struct NodeInfo {
+    pub node_id: NodeId,
+    pub node_type: String,
+    pub connections: Vec<NodeId>,
+    pub metrics: NodeMetrics,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "category")]
+pub enum NodeMetrics {
+    Drone {
+        pdr: f32,
+        current_pdr: f32,
+        packets_sent: u64,
+        packets_dropped: u64,
+        shortcuts_used: u64,
+        packet_type_counts: HashMap<PacketTypeLabel, u64>,
+    },
+    Host {
+        packets_sent: u64,
+        packets_acked: u64,
+        shortcuts_used: u64,
+        packet_type_counts: HashMap<PacketTypeLabel, u64>,
+        latencies: Vec<u64>, // Millisecondi
+    },
+    None, // Per nodi senza metriche
+}
+
 #[tauri::command]
-pub fn get_node_info(state: State<Arc<Mutex<NetworkState>>>, node_id: NodeId) -> Value {
+pub fn get_node_info(
+    state: State<Arc<Mutex<NetworkState>>>,
+    node_id: NodeId,
+) -> Result<NodeInfo, String> {
     let state = state.lock();
 
-    if let Some(metadata) = state.graph.node_info.get(&node_id) {
-        let mut connections = state
-            .graph
-            .adjacency
-            .get(&node_id)
-            .cloned()
-            .unwrap_or_default();
-        connections.sort();
-        let mut node_data = json!({
-            "node_id": node_id,
-            "type": match metadata.node_type {
-                NodeType::Drone => "Drone",
-                NodeType::Client => "Client",
-                NodeType::Server => "Server",
-            },
-            "connections": connections,
-        });
+    let metadata = state
+        .graph
+        .node_info
+        .get(&node_id)
+        .ok_or_else(|| format!("Node {} not found", node_id))?;
 
-        if let NodeType::Drone = metadata.node_type {
-            if let Some(metrics) = state.metrics.drone_metrics.get(&node_id) {
-                node_data["pdr"] = json!(metrics.current_pdr);
-                node_data["packets_sent"] = json!(metrics.number_of_packets_sent());
-                node_data["packets_dropped"] = json!(metrics.drops);
+    let connections = state
+        .graph
+        .adjacency
+        .get(&node_id)
+        .cloned()
+        .unwrap_or_default();
+
+    let node_type = match metadata.node_type {
+        NodeType::Drone => "Drone",
+        NodeType::Client => "Client",
+        NodeType::Server => "Server",
+    };
+
+    let metrics = match metadata.node_type {
+        NodeType::Drone => {
+            let drone_metrics = state.metrics.drone_metrics.get(&node_id);
+            NodeMetrics::Drone {
+                pdr: metadata.pdr,
+                current_pdr: drone_metrics.map_or(0.0, |m| m.current_pdr),
+                packets_sent: drone_metrics.map_or(0, |m| m.number_of_packets_sent()),
+                packets_dropped: drone_metrics.map_or(0, |m| m.drops),
+                shortcuts_used: drone_metrics.map_or(0, |m| m.shortcuts),
+                packet_type_counts: drone_metrics
+                    .map_or(HashMap::new(), |m| m.packet_type_counts.clone()),
             }
         }
+        NodeType::Client | NodeType::Server => {
+            let host_metrics = state.metrics.host_metrics.get(&node_id);
+            NodeMetrics::Host {
+                packets_sent: host_metrics.map_or(0, |m| m.number_of_packets_sent()),
+                packets_acked: host_metrics
+                    .map_or(0, |m| m.dest_stats.values().map(|(_, acked)| acked).sum()),
+                shortcuts_used: host_metrics.map_or(0, |m| m.shortcuts),
+                packet_type_counts: host_metrics
+                    .map_or(HashMap::new(), |m| m.packet_type_counts.clone()),
+                latencies: host_metrics.map_or(vec![], |m| {
+                    m.latencies
+                        .iter()
+                        .map(|lat| lat.as_millis() as u64)
+                        .collect()
+                }),
+            }
+        }
+    };
 
-        node_data
-    } else {
-        json!({ "error": "Node not found" })
-    }
+    Ok(NodeInfo {
+        node_id,
+        node_type: node_type.to_string(),
+        connections,
+        metrics,
+    })
 }
 
 #[tauri::command]

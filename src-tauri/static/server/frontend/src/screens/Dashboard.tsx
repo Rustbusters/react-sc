@@ -1,6 +1,5 @@
 import React, { Fragment, useContext, useEffect, useState } from 'react';
 import PieChart from "../components/PieChart"
-import LineChart from "../components/LineChart"
 import BarChart from "../components/BarChart"
 
 import { GlobalStateContext } from '../GlobalState';
@@ -22,11 +21,20 @@ const Dashboard: React.FC<DashboardProps> = () => {
             // Initialize the combinedStats by reducing totalStats
             const combinedStats = Array.from(totalStats.values()).reduce((acc, stats) => ({
                 messagesSent: acc.messagesSent + stats.messagesSent,
-                fragmentsSent: acc.fragmentsSent + stats.fragmentsSent,
                 messagesReceived: acc.messagesReceived + stats.messagesReceived,
-                fragmentsReceived: acc.fragmentsReceived + stats.fragmentsReceived,
+
+                messageFragmentsSent: acc.messageFragmentsSent + stats.messageFragmentsSent,
+                messageFragmentsReceived: acc.messageFragmentsReceived + stats.messageFragmentsReceived,
+
+                floodRequestsSent: acc.floodRequestsSent + stats.floodRequestsSent,
+                floodRequestsReceived: acc.floodRequestsReceived + stats.floodRequestsReceived,
+
+                floodResponsesSent: acc.floodResponsesSent + stats.floodResponsesSent,
+                floodResponsesReceived: acc.floodResponsesReceived + stats.floodResponsesReceived,
+
                 acksSent: acc.acksSent + stats.acksSent,
                 acksReceived: acc.acksReceived + stats.acksReceived,
+
                 nacksReceived: acc.nacksReceived + stats.nacksReceived,
             }), defaultStats);
             setCombinedStats(combinedStats);
@@ -34,7 +42,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }, [totalStats]);
 
     return (
-        <div className="p-8 flex flex-1 bg-gray-50">
+        <div className="p-8 flex flex-1 bg-gray-50 dark:bg-black">
             <div className="flex flex-col flex-1 overflow-y-scroll">
                 <main>
                     <Title title="Dashboard" label="Here you can check the server's performance, messages/fragments sent/received." />

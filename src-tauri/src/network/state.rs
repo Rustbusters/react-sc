@@ -29,7 +29,7 @@ pub struct GraphState {
 pub struct NodeMetadata {
     pub node_type: NodeType,
     pub pdr: f32,
-    pub crashed: bool,
+    pub crashed: bool, // TODO: is this needed?
 }
 
 /// Simple enum to distinguish node types.
@@ -322,39 +322,48 @@ impl NetworkState {
     /// Sends a "Crash" command to a drone, removing it from the current graph and
     /// channels, but does NOT update the static config. The config remains the
     /// original state from which we started.
-    pub fn send_crash_command(&mut self, drone_id: NodeId) -> Result<(), String> {
-        // Remove all neighbors from the crashed drone
-        if let Some(neighbors) = self.graph.adjacency.get(&drone_id) {
-            for &neighbor_id in neighbors { // TODO: fix crash behavior
-                 // self.send_remove_sender_command(drone_id, &self.get_node_type(drone_id).unwrap(), neighbor_id.clone());
-            }
+    pub fn send_crash_command(&mut self, drone_id: NodeId) -> Result<(), NetworkError> {
+        let node_type = self
+            .get_node_type(drone_id)
+            .ok_or_else(|| NetworkError::NodeNotFound(drone_id.to_string()))?;
+
+        let neighbors = self
+            .graph
+            .adjacency
+            .get(&drone_id)
+            .cloned()
+            .unwrap_or_default();
+
+        for &neighbor in &neighbors {
+            let neighbor_type = self
+                .get_node_type(neighbor)
+                .ok_or_else(|| NetworkError::NodeNotFound(neighbor.to_string()))?;
+            self.send_remove_sender_command(drone_id, &node_type, neighbor)?;
+            self.send_remove_sender_command(neighbor, &neighbor_type, drone_id)?;
         }
 
-        // Send command to the drone if it exists
         if let Some((cmd_sender, _)) = self.drones_controller_channels.get(&drone_id) {
-            cmd_sender
-                .send(DroneCommand::Crash)
-                .map_err(|_| "Failed to send Crash command")?;
+            cmd_sender.send(DroneCommand::Crash).map_err(|_| {
+                NetworkError::CommandSendError(format!(
+                    "Failed to send Crash command to drone {}",
+                    drone_id
+                ))
+            })?;
+        } else {
+            return Err(NetworkError::ChannelNotFound(drone_id));
         }
 
         debug!("Crashing drone {}", drone_id);
 
-        // Remove from runtime structures
         self.drones_controller_channels.remove(&drone_id);
         self.inter_node_channels.remove(&drone_id);
         self.node_threads.remove(&drone_id);
+        self.graph.node_info.remove(&drone_id);
+        self.graph.adjacency.remove(&drone_id);
 
-        // Mark crashed in the graph
-        if let Some(meta) = self.graph.node_info.get_mut(&drone_id) {
-            meta.crashed = true;
-        }
-
-        // Remove adjacency for the crashed drone
-        if let Some(neighbors) = self.graph.adjacency.remove(&drone_id) {
-            for n in neighbors {
-                if let Some(adj_list) = self.graph.adjacency.get_mut(&n) {
-                    adj_list.retain(|&id| id != drone_id);
-                }
+        for &neighbor in &neighbors {
+            if let Some(adj_list) = self.graph.adjacency.get_mut(&neighbor) {
+                adj_list.retain(|&id| id != drone_id);
             }
         }
 
@@ -547,7 +556,6 @@ impl NetworkState {
     }
 
     // --------------------------------------------------------------------------
-    
 
     pub fn get_status(&self) -> NetworkStatus {
         self.status.clone()
