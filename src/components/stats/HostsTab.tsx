@@ -4,7 +4,7 @@ const HostsTab = () => {
   return (
     <div className="py-6 space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-4 grid-rows-3 gap-6">
-        <Card className="md:col-span-2 md:row-span-3 p-6 shadow-lg border rounded-lg bg-white dark:bg-gray-900">
+        <Card className="md:col-span-2 md:row-span-3 p-6">
           <CardHeader>
             <CardTitle className="text-lg font-semibold">Drop / MsgFragment</CardTitle>
           </CardHeader>
@@ -13,7 +13,7 @@ const HostsTab = () => {
           </CardContent>
         </Card>
 
-        <Card className="p-6 shadow-lg border rounded-lg bg-white dark:bg-gray-900">
+        <Card className="p-6">
           <CardHeader>
             <CardTitle className="text-lg font-semibold">Numero Messaggi</CardTitle>
           </CardHeader>
@@ -22,7 +22,7 @@ const HostsTab = () => {
           </CardContent>
         </Card>
 
-        <Card className="p-6 shadow-lg border rounded-lg bg-white dark:bg-gray-900">
+        <Card className="p-6">
           <CardHeader>
             <CardTitle className="text-lg font-semibold">Numero Frammenti</CardTitle>
           </CardHeader>
@@ -31,7 +31,7 @@ const HostsTab = () => {
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-2 md:row-span-2 p-6 shadow-lg border rounded-lg bg-white dark:bg-gray-900">
+        <Card className="md:col-span-2 md:row-span-2 p-6">
           <CardHeader>
             <CardTitle className="text-lg font-semibold">Latenza nel Tempo</CardTitle>
           </CardHeader>

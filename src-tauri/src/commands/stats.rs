@@ -123,6 +123,7 @@ pub fn get_new_messages(
         .map(|(idx, event)| {
             let message_id = start_index + idx;
             match event {
+                // FIXME: panics here
                 ControllerEvent::Drone { node_id, event } => {
                     let node_type = "Drone".to_string();
                     match event {

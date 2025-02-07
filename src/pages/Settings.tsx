@@ -192,7 +192,7 @@ const Settings = () => {
 
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-6 pb-20 max-w-3xl mx-auto overflow-y-scroll scrollbar-hide">
       <div className="w-full grid grid-cols-3 gap-4">
         <div className="col-span-1 border-r pr-4">
           <h2 className="text-lg font-semibold mb-2">Default Configurations</h2>
@@ -213,7 +213,7 @@ const Settings = () => {
         </div>
 
         <div className="col-span-2">
-          <h2 className="text-lg font-semibold mb-2">Carica Configurazione</h2>
+          <h2 className="text-lg font-semibold mb-2">Upload Configurazione</h2>
           <div className="flex space-x-2">
             <Input
               value={ configPath }
@@ -234,7 +234,7 @@ const Settings = () => {
           <div className="space-y-2 max-h-72 overflow-y-auto">
             { historyConfigs.map((config) => (
               <div key={ config.id }
-                   className="flex justify-between items-center p-3 border rounded-lg shadow-sm bg-white">
+                   className="flex justify-between items-center p-3 border rounded-lg shadow-sm">
                 <div className="grow truncate text-ellipsis">
                   <p className="font-medium">{ config.name }</p>
                   <p className="text-xs text-gray-500">{ new Date(config.timestamp * 1000).toLocaleString() }</p>

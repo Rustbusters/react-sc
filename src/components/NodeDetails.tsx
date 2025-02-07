@@ -164,9 +164,10 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
   if (!nodeData) return <p className="text-center">Caricamento...</p>;
 
   return (
-    <div className="fixed right-0 top-0 h-full w-[400px] bg-white shadow-xl flex flex-col border-l border-gray-200">
-      <div className="p-4 flex justify-between items-center border-b border-gray-200 bg-white sticky top-0">
-        <h2 className="text-xl font-bold flex items-center">
+    <div
+      className="fixed right-0 top-0 h-full w-[400px] bg-background shadow-xl flex flex-col border-l">
+      <div className="p-4 flex justify-between items-center border-b sticky top-0">
+        <h2 className="text-xl font-semibold flex items-center">
           Dettagli Nodo #{ nodeId }
           <span className={ `ml-3 px-2 py-1 text-sm rounded-md ${ getTypeColor(nodeData.node_type) }` }>
             { nodeData.node_type }
@@ -191,11 +192,11 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         <div>
-          <Label className="text-gray-600">Vicini</Label>
+          <Label className="text-muted-foreground">Vicini</Label>
           <div className="mt-2 space-y-2">
             { nodeData.connections.length > 0 ? (
               nodeData.connections.map((neighbor) => (
-                <div key={ neighbor } className="flex items-center justify-between bg-gray-100 px-3 py-2 rounded-md">
+                <div key={ neighbor } className="flex items-center justify-between bg-muted px-3 py-2 rounded-md">
                   <span className="font-medium">{ neighbor }</span>
                   <Button variant="destructive" size="icon" onClick={ () => removeNeighbor(neighbor) }>
                     <Trash2 size={ 16 }/>
@@ -218,7 +219,7 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
         { nodeData.metrics.category === "Drone" && (
           <>
             <div>
-              <Label className="text-gray-600">PDR (Packet Drop Rate)</Label>
+              <Label className="text-muted-foreground">PDR (Packet Drop Rate)</Label>
               <div className="flex items-center space-x-2 mt-2">
                 <Input type="number" step="0.01" min="0" max="1" value={ nodeData.metrics.pdr.toFixed(2) }
                        onChange={ (e) => updatePdr(parseFloat(e.target.value)) }/>
@@ -231,9 +232,9 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
         ) }
 
         <div>
-          <Label className="text-gray-600">Statistiche</Label>
+          <Label className="text-muted-foreground">Statistiche</Label>
           <pre
-            className="relative bg-gray-100 p-3 rounded-md text-sm">{ JSON.stringify(nodeData.metrics, null, 2) }
+            className="relative bg-muted p-3 rounded-md text-sm">{ JSON.stringify(nodeData.metrics, null, 2) }
           </pre>
         </div>
       </div>

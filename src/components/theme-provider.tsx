@@ -9,15 +9,15 @@ type ThemeProviderProps = {
 };
 
 type ThemeProviderState = {
-  // theme: Theme;
-  //setTheme: (theme: Theme) => void;
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
   richColors: boolean;
   setRichColors: (richColors: boolean) => void;
 };
 
 const initialState: ThemeProviderState = {
-  // theme: "system",
-  // setTheme: () => null,
+  theme: "system",
+  setTheme: () => null,
   richColors: true, // Default: toast colorati
   setRichColors: () => null,
 };
@@ -26,14 +26,14 @@ const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
 export function ThemeProvider({
                                 children,
-                                // defaultTheme = "light",
-                                // storageKey = "vite-ui-theme",
+                                defaultTheme = "system",
+                                storageKey = "vite-ui-theme",
                                 ...props
                               }: ThemeProviderProps) {
 
-  /*const [theme, setTheme] = useState<Theme>(
+  const [theme, setTheme] = useState<Theme>(
     () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
-  );*/
+  );
 
   // Stato di richColors per i toast
   const [richColors, setRichColors] = useState<boolean>(
@@ -41,7 +41,7 @@ export function ThemeProvider({
   );
 
   // Effetto per aggiornare la classe del tema
-  /*useEffect(() => {
+  useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove("light", "dark");
 
@@ -55,7 +55,7 @@ export function ThemeProvider({
     }
 
     root.classList.add(theme);
-  }, [theme]);*/
+  }, [theme]);
 
   // Effetto per salvare richColors nel localStorage
   useEffect(() => {
@@ -63,11 +63,11 @@ export function ThemeProvider({
   }, [richColors]);
 
   const value = {
-    /*theme,
+    theme,
     setTheme: (theme: Theme) => {
       localStorage.setItem(storageKey, theme);
       setTheme(theme);
-    },*/
+    },
     richColors,
     setRichColors: (value: boolean) => {
       localStorage.setItem("richColors", String(value));
