@@ -233,7 +233,8 @@ pub fn get_network_infos(state: State<Arc<Mutex<NetworkState>>>) -> Value {
     json!({ "nodes": nodes_info })
 }
 
-use crate::network::metrics::PacketTypeLabel;
+use crate::error::NetworkError;
+use crate::network::metrics::{DroneMetrics, PacketTypeLabel};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -347,4 +348,74 @@ pub fn get_host_stats(state: State<Arc<Mutex<NetworkState>>>, node_id: NodeId) -
     } else {
         json!({ "error": "Host not found" })
     }
+}
+
+// =============================================================================
+#[derive(Serialize, Deserialize)]
+pub struct OverviewMetrics {
+    total_messages_sent: u64,
+    total_packets_sent: u64,
+    packets_by_type: HashMap<PacketTypeLabel, u64>,
+    heatmap: HashMap<String, u64>,
+}
+
+#[tauri::command]
+pub fn get_overview_metrics(
+    state: State<Arc<Mutex<NetworkState>>>,
+) -> Result<OverviewMetrics, String> {
+    let state = state.lock();
+
+    // calculate number of messages sent by all hosts
+    let total_messages_sent: u64 = state
+        .metrics
+        .host_metrics
+        .values()
+        .map(|m| m.number_of_messages_sent())
+        .sum();
+
+    // collect packet sent by all drones and all hosts, by packet type
+    let mut packets_by_type: HashMap<PacketTypeLabel, u64> = HashMap::new();
+
+    for metrics in state.metrics.drone_metrics.values() {
+        for (packet_type, count) in &metrics.packet_type_counts {
+            *packets_by_type.entry(*packet_type).or_default() += count;
+        }
+    }
+
+    for metrics in state.metrics.host_metrics.values() {
+        for (packet_type, count) in &metrics.packet_type_counts {
+            *packets_by_type.entry(*packet_type).or_default() += count;
+        }
+    }
+
+    let total_packets_sent: u64 = packets_by_type.values().sum();
+
+    let heatmap: HashMap<String, u64> = state
+        .metrics
+        .global_heatmap
+        .iter()
+        .map(|((src, dest), count)| (format!("{},{}", src, dest), *count))
+        .collect();
+
+    Ok(OverviewMetrics {
+        total_messages_sent,
+        total_packets_sent,
+        packets_by_type,
+        heatmap,
+    })
+}
+
+#[tauri::command]
+pub fn get_drone_metrics(
+    state: State<Arc<Mutex<NetworkState>>>,
+    node_id: NodeId,
+) -> Result<DroneMetrics, NetworkError> {
+    let state = state.lock();
+
+    state
+        .metrics
+        .drone_metrics
+        .get(&node_id)
+        .cloned()
+        .ok_or_else(|| NetworkError::NodeNotFound(node_id.to_string()))
 }

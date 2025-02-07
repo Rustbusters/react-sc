@@ -1,12 +1,56 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import OverviewTab from "@/components/stats/OverviewTab.tsx";
 import NetworkTab from "@/components/stats/NetworkTab.tsx";
 import DronesTab from "@/components/stats/DronesTab.tsx";
 import HostsTab from "@/components/stats/HostsTab.tsx";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
+import { invoke } from "@tauri-apps/api/core";
+import { toast } from "sonner";
+
+interface NetworkNode {
+  id: number;
+  type: string;
+  pdr: number;
+  crashed: boolean;
+}
 
 const NetworkStatsPage = () => {
   const [activeTab, setActiveTab] = useState("overview");
+  const [nodes, setNodes] = useState<NetworkNode[]>([]);
+  const [filteredNodes, setFilteredNodes] = useState<NetworkNode[]>([]);
+  const [selectedNode, setSelectedNode] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchNodes = async () => {
+      try {
+        const response: NetworkNode[] = await invoke("get_network_nodes");
+        setNodes(response);
+      } catch (error) {
+        console.error("Error fetching network nodes:", error);
+        toast.error("Error fetching network nodes.");
+      }
+    };
+
+    fetchNodes();
+  }, []);
+
+  useEffect(() => {
+    let filtered: NetworkNode[] = [];
+    if (activeTab === "drones") {
+      filtered = nodes.filter(node => node.type === "Drone");
+    } else if (activeTab === "hosts") {
+      filtered = nodes.filter(node => node.type === "Client" || node.type === "Server");
+    }
+    setFilteredNodes(filtered);
+
+    // Seleziona il primo nodo della lista automaticamente
+    if (filtered.length > 0) {
+      setSelectedNode(filtered[0].id);
+    } else {
+      setSelectedNode(null);
+    }
+  }, [activeTab, nodes]);
 
   return (
     <div className="p-6 pt-2 space-y-2">
@@ -25,11 +69,19 @@ const NetworkStatsPage = () => {
             <TabsTrigger value="hosts">Hosts</TabsTrigger>
           </TabsList>
 
-          {/* Dropdown selezione nodo, visibile solo per Drones o Hosts */ }
-          { (activeTab === "drones" || activeTab === "hosts") && (
-            <p>
-              Drone/Host
-            </p>
+          { (activeTab === "drones" || activeTab === "hosts") && filteredNodes.length > 0 && (
+            <Select value={ selectedNode?.toString() } onValueChange={ (value) => setSelectedNode(Number(value)) }>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select a node"/>
+              </SelectTrigger>
+              <SelectContent>
+                { filteredNodes.map(node => (
+                  <SelectItem key={ node.id } value={ node.id.toString() }>
+                    { node.type } #{ node.id }
+                  </SelectItem>
+                )) }
+              </SelectContent>
+            </Select>
           ) }
         </div>
 
@@ -41,7 +93,7 @@ const NetworkStatsPage = () => {
           <NetworkTab/>
         </TabsContent>
         <TabsContent value="drones">
-          <DronesTab/>
+          <DronesTab selectedDroneId={ selectedNode as number }/>
         </TabsContent>
         <TabsContent value="hosts">
           <HostsTab/>

@@ -10,7 +10,7 @@ const Home = () => {
   return (
     <div className="w-full h-full p-6 flex flex-col space-y-6 select-none">
       {/* Title */ }
-      <h1 className="text-3xl font-bold">🏠 Simulation Controller</h1>
+      <h1 className="text-3xl font-bold">Simulation Controller</h1>
       <p className="text-muted-foreground">
         Welcome to the Simulation Controller! Follow these steps to set up your simulation.
       </p>

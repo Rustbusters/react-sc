@@ -1,12 +1,15 @@
 use crate::error::NetworkError;
-use crate::network::state::{GraphState, NetworkState, NetworkStatus};
+use crate::network::state::{GraphState, NetworkState, NetworkStatus, NodeMetadata, NodeType};
 use common_utils::HostCommand;
 use log::{error, info};
 use parking_lot::Mutex;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::State as TauriState;
 use tauri::{AppHandle, Emitter};
 use wg_2024::controller::DroneCommand;
+use wg_2024::network::NodeId;
 
 /// Starts the network by initializing the network state and starting all nodes.
 #[tauri::command]
@@ -115,4 +118,40 @@ pub fn stop_network(
 
     info!("Network stopped successfully");
     Ok(())
+}
+
+// =============================================================================
+use serde_json::{json, Value};
+
+#[tauri::command]
+pub fn get_network_nodes(
+    state: TauriState<Arc<Mutex<NetworkState>>>,
+) -> Result<Value, NetworkError> {
+    let state = state.lock();
+
+    if state.get_status() != NetworkStatus::Running {
+        return Err(NetworkError::NetworkNotRunning);
+    }
+
+    let mut nodes_json: Vec<Value> = state
+        .graph
+        .node_info
+        .iter()
+        .map(|(node_id, metadata)| {
+            json!({
+                "id": node_id,
+                "type": match metadata.node_type {
+                    NodeType::Drone => "Drone",
+                    NodeType::Client => "Client",
+                    NodeType::Server => "Server",
+                },
+                "pdr": metadata.pdr,
+                "crashed": metadata.crashed
+            })
+        })
+        .collect();
+
+    nodes_json.sort_by(|a, b| a["id"].as_u64().cmp(&b["id"].as_u64()));
+
+    Ok(json!(nodes_json))
 }

@@ -40,7 +40,7 @@ impl From<&PacketTypeHeader> for PacketTypeLabel {
 }
 
 // =============================================================================
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MetricsTimePoint {
     pub timestamp: u64,
     pub sent: u64,
@@ -48,7 +48,7 @@ pub struct MetricsTimePoint {
 }
 
 // =============================================================================
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DroneMetrics {
     /// Number of packets dropped by the drone
     pub drops: u64,
@@ -77,7 +77,7 @@ impl DroneMetrics {
     }
 
     pub fn update_pdr(&mut self, successful: bool) {
-        self.current_pdr = self.current_pdr * 0.99 + if successful { 0.01 } else { 0.0 };
+        self.current_pdr = self.current_pdr * 0.99 + if successful { 0.00 } else { 0.1 };
 
         let sent = self.number_of_msg_fragments_sent();
         let dropped = self.drops;
@@ -117,7 +117,7 @@ pub struct HostMetrics {
     pub shortcuts: u64,
     /// Count for each packet type sent by the host
     pub packet_type_counts: HashMap<PacketTypeLabel, u64>,
-    /// Latency for each message sent by the host
+    /// Latency for each message sent by the host. It could be use to compute number of Message sent
     pub latencies: Vec<Duration>,
     /// Time series for the number of packets sent and dropped
     pub time_series: Vec<MetricsTimePoint>,
@@ -148,6 +148,10 @@ impl HostMetrics {
 
     pub fn number_of_packets_sent(&self) -> u64 {
         self.packet_type_counts.values().sum()
+    }
+
+    pub fn number_of_messages_sent(&self) -> u64 {
+        self.latencies.len() as u64
     }
 }
 
