@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart.tsx";
 import { CartesianGrid, Line, LineChart, XAxis } from "recharts";
 import { NetworkNode } from "@/pages/NetworkStats.tsx";
+import { useSimulation } from "@/components/SimulationContext.tsx";
 
 interface LatencyData {
   secs: number;

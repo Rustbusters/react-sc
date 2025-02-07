@@ -47,8 +47,6 @@ pub enum NodeType {
     Server,
 }
 
-const MAX_HISTORY: usize = 100000;
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum NetworkStatus {
     Init,
