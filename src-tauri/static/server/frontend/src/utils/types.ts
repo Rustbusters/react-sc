@@ -62,6 +62,7 @@ export type MessageType = {
     srcId: string;
     destId: string;
     message: string;
+    timestamp: number;
 };
 
 export type ServerMessages = Map<number, MessageType[]>;

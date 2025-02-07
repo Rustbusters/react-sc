@@ -24,52 +24,33 @@ const App: React.FC<AppProps> = () => {
 
   // Server messages
   let [serversMessages, setServersMessages] = useState<ServerMessages>(new Map());
+  serversMessages.set(0, [
+    { id: "1", srcId: "2", destId: "3", message: "Hello World", timestamp: 1707321600000 },
+    { id: "4", srcId: "1", destId: "3", message: "Hello World", timestamp: 1707321600000 },
+    { id: "2", srcId: "3", destId: "3", message: "Yo", timestamp: 1707321600002 },
+    { id: "3", srcId: "1", destId: "2", message: "My N", timestamp: 1707321600001 },
+  ]);
   // List of active users on each server
   let [serverActiveUsers, setActiveUsers] = useState<ServerActiveUsers>(new Map());
 
-  const handleStats = (serverId: number, stats: any) => {
-    // Validate stats structure
-    const newStats: StatsType = {
-      messagesSent: stats["messages_sent"],
-      messagesReceived: stats["messages_received"],
-
-      messageFragmentsSent: stats["message_fragments_sent"],
-      messageFragmentsReceived: stats["message_fragments_received"],
-
-      floodRequestsSent: stats["flood_requests_sent"],
-      floodRequestsReceived: stats["flood_requests_received"],
-
-      floodResponsesSent: stats["flood_responses_sent"],
-      floodResponsesReceived: stats["flood_responses_received"],
-
-      acksSent: stats["acks_sent"],
-      acksReceived: stats["acks_received"],
-
-      nacksReceived: stats["nacks_received"],
-    };
-    totalStats.set(serverId, newStats);
+  const handleStats = (serverId: number, stats: StatsType) => {
+    totalStats.set(serverId, stats);
     setTotalStats(new Map(totalStats));
   }
 
-  const handleMessages = (serverId: number, messages: any) => {
-    // Validate server messages structure
-    const newMessages: MessageType[] = messages.map((m: any) => ({
-      id: m["id"],
-      srcId: m["src_id"],
-      destId: m["dest_id"],
-      message: m["message"],
-    }));
-    serversMessages.set(serverId, newMessages);
+  const handleNewMessage = (serverId: number, message: MessageType) => {
+    const curMessages = serversMessages.get(serverId) ?? [];
+    serversMessages.set(serverId, [...curMessages, message]);
     setServersMessages(new Map(serversMessages));
   }
 
-  const handleActiveUsers = (serverId: number, activeUsers: any) => {
-    // Validate active users message structure
-    const newActiveUsers: UserType[] = activeUsers.map((u: any) => ({
-      id: u["id"],
-      name: u["name"]
-    }));
-    serverActiveUsers.set(serverId, newActiveUsers);
+  const handleMessages = (serverId: number, messages: MessageType[]) => {
+    serversMessages.set(serverId, messages);
+    setServersMessages(new Map(serversMessages));
+  }
+
+  const handleActiveUsers = (serverId: number, activeUsers: UserType[]) => {
+    serverActiveUsers.set(serverId, activeUsers);
     setActiveUsers(new Map(serverActiveUsers));
   }
 
@@ -87,14 +68,18 @@ const App: React.FC<AppProps> = () => {
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        const serverId: number = data["server_id"];
+        const serverId: number = data["serverId"];
 
         if ("stats" in data) { // Stats parsing
           handleStats(serverId, data["stats"]);
+        } else if ("newMessage" in data) {
+          console.log(`New Message: ${serverId} ${data["newMessage"]}`);
+          handleNewMessage(serverId, data["newMessage"]);
         } else if ("messages" in data) { // Server messages parsing
+          console.log(`Messages: ${serverId} ${data["messages"]}`);
           handleMessages(serverId, data["messages"]);
-        } else if ("active_users" in data) {
-          handleActiveUsers(serverId, data["active_users"]);
+        } else if ("activeUsers" in data) {
+          handleActiveUsers(serverId, data["activeUsers"]);
         }
       } catch (err) {
         console.error("Failed to parse message: ", err);

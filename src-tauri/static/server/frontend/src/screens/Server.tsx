@@ -69,7 +69,9 @@ const Server: React.FC<ServerProps> = ({ id, stats, messages, activeUsers }) => 
                                 { key: "id", label: "ID" },
                                 { key: "srcId", label: "Source ID", render: (value) => <span className="px-3 py-2 rounded-xl bg-indigo-500 text-white">{value}</span> },
                                 { key: "destId", label: "Destination ID", render: (value) => <span className="px-3 py-2 rounded-xl bg-blue-500 text-white">{value}</span> },
-                                { key: "message", label: "Message", render: (value) => <div>{value.startsWith("data:image") ? <img width="200px" src={value} /> : <span>{value}</span>}</div> }]} />
+                                { key: "message", label: "Message", render: (value) => <div>{value.startsWith("data:image") ? <img width="200px" src={value} /> : <span>{value}</span>}</div> },
+                                { key: "timestamp", label: "Timestamp", render: (value: number) => <span className="px-3 py-2 rounded-lg bg-slate-500 dark:bg-slate-700 text-white">{(new Date(value * 1000)).toUTCString()}</span> },
+                            ]} />
                         </ExpandableSection>
                         <ExpandableSection title="Active Users" isOpen={isActiveUsersOpen} setIsOpen={setIsActiveUsersOpen}>
                             <Table data={activeUsers} columns={[
@@ -89,7 +91,7 @@ type Comparable = string | number | boolean | Date;
 // Generic type for table props
 type TableProps<T extends Record<string, Comparable>> = {
     data: T[];
-    columns: { key: keyof T; label: string; render?: (value: any, row: T) => React.ReactNode }[];
+    columns: { key: string; label: string; render?: (value: any, row: T) => React.ReactNode }[];
     rowsPerPage?: number;
 };
 
@@ -99,6 +101,8 @@ const Table = <T extends Record<string, Comparable>>({ data, columns, rowsPerPag
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     let [ascending, setAscending] = useState(true);
+
+    const sortableColumns = new Set<string>(["timestamp"]);
 
     const calculatePagination = () => {
         const total = Math.ceil(data.length / rowsPerPage);
@@ -125,23 +129,30 @@ const Table = <T extends Record<string, Comparable>>({ data, columns, rowsPerPag
                                             ">
                                                 <div className="relative group">
                                                     <div onClick={() => {
-                                                        ascending = !ascending;
-                                                        data.sort((a, b) => {
-                                                            const valueA = a[col.key];
-                                                            const valueB = b[col.key];
+                                                        if (sortableColumns.has(col.key)) {
+                                                            ascending = !ascending;
+                                                            data.sort((a, b) => {
+                                                                const valueA = a[col.key];
+                                                                const valueB = b[col.key];
 
-                                                            if (valueA < valueB) return ascending ? -1 : 1;
-                                                            if (valueA > valueB) return ascending ? 1 : -1;
-                                                            return 0;
-                                                        }); calculatePagination(); setAscending(ascending);
+                                                                if (valueA < valueB) return ascending ? -1 : 1;
+                                                                if (valueA > valueB) return ascending ? 1 : -1;
+                                                                return 0;
+                                                            }); calculatePagination(); setAscending(ascending);
+                                                        }
                                                     }} className="flex items-center justify-between space-x-4 p-1 rounded-lg hover:text-indigo-400 hover:bg-slate-100 dark:hover:text-indigo-400 dark:hover:bg-slate-800 hover:cursor-pointer">
                                                         <span className="">{col.label}</span>
-                                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-4 text-slate-400">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 10.5 12 3m0 0 7.5 7.5M12 3v18" />
-                                                        </svg>
+                                                        {
+                                                            sortableColumns.has(col.key) ? (ascending ? <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-4 text-slate-400">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 13.5 12 21m0 0-7.5-7.5M12 21V3" />
+                                                            </svg> : <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-4 text-slate-400">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 10.5 12 3m0 0 7.5 7.5M12 3v18" />
+                                                            </svg>
+                                                            ) : null
+                                                        }
 
                                                     </div>
-                                                    <span className="absolute top-[2rem] left-0 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-300 bg-slate-300 dark:bg-slate-800 text-white text-sm rounded-lg px-2 py-2">Sort</span>
+                                                    {sortableColumns.has(col.key) ? <span className="absolute top-[2rem] left-0 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-300 bg-indigo-500 dark:bg-indigo-800 text-white text-sm rounded-lg px-2 py-2">Sort {ascending ? "ascending" : "discending"}</span> : null}
                                                 </div>
                                             </th>
                                         ))}
