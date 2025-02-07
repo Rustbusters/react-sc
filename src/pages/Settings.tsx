@@ -253,7 +253,11 @@ const Settings = () => {
             )) }
           </div>
         </div>
+      </div>
 
+      <Separator className="my-6"/>
+
+      <div className="w-full grid grid-cols-3 gap-4">
         {/* Max Messages Setting */ }
         <div className="space-y-2">
           <Label htmlFor="maxMessages">Max Log Messages</Label>

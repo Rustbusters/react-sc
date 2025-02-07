@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch.tsx";
 import { Progress } from "@/components/ui/progress";
 import { useSimulation } from "@/components/SimulationContext.tsx";
 
@@ -66,7 +65,7 @@ export default function SendPacketForm() {
   // Local state for progress and sending status
   const [progressData, setProgressData] = useState<{ sent: number; remaining: number }>({ sent: 0, remaining: 0 });
   const [isSending, setIsSending] = useState(false);
-  const [isRandomMode, setIsRandomMode] = useState(false);
+  // const [isRandomMode, setIsRandomMode] = useState(false);
   const { status } = useSimulation();
 
 
@@ -418,7 +417,7 @@ export default function SendPacketForm() {
           </div>
 
           {/* Random Mode switch */ }
-          <FormField
+          {/*<FormField
             control={ form.control }
             name="randomMode"
             render={ ({ field }) => (
@@ -438,7 +437,7 @@ export default function SendPacketForm() {
                 </div>
               </FormItem>
             ) }
-          />
+          />*/ }
 
           {/* Submit Button */ }
           <div className="flex justify-center gap-4">
