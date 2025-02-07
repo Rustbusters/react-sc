@@ -37,7 +37,7 @@ const Settings = () => {
 
   const [strict, setStrict] = useState<boolean>(false);
 
-  const { theme, setTheme, richColors, setRichColors } = useTheme();
+  const { richColors, setRichColors } = useTheme();
 
   const getLastConfigFilePath = async (): Promise<string> => {
     const historyDir = await invoke<string>("get_history_dir");
@@ -155,10 +155,6 @@ const Settings = () => {
     localStorage.setItem("maxMessages", maxMessages.toString());
     window.dispatchEvent(new Event("storage"));
   }, [maxMessages]);
-
-  useEffect(() => {
-    localStorage.setItem("richColors", String(richColors));
-  }, [richColors]);
 
   useEffect(() => {
     const fetchSettings = async () => {
