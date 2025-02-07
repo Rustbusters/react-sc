@@ -12,6 +12,10 @@ const SimulationContext = createContext<{
   startNetwork: () => Promise<void>;
   stopNetwork: () => Promise<void>;
   restartNetwork: () => Promise<void>;
+  clientUrl: string;
+  setClientUrl: (url: string) => void;
+  serverUrl: string;
+  setServerUrl: (url: string) => void;
 }>({
   status: "Init",
   isLoading: true,
@@ -21,6 +25,12 @@ const SimulationContext = createContext<{
   },
   restartNetwork: async () => {
   },
+  clientUrl: "",
+  setClientUrl: () => {
+  },
+  serverUrl: "http://127.0.0.1:8080",
+  setServerUrl: () => {
+  }
 });
 
 // Custom hook to access the simulation context
@@ -29,6 +39,17 @@ export const useSimulation = () => useContext(SimulationContext);
 export const SimulationProvider = ({ children }: { children: React.ReactNode }) => {
   const [status, setStatus] = useState<NetworkStatus>("Init");
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [clientUrl, setClientUrl] = useState<string>(localStorage.getItem("clientUrl") || "http://localhost:7373");
+  const [serverUrl, setServerUrl] = useState<string>(localStorage.getItem("serverUrl") || "http://127.0.0.1:8080");
+
+  useEffect(() => {
+    localStorage.setItem("clientUrl", clientUrl);
+  }, [clientUrl]);
+
+  useEffect(() => {
+    localStorage.setItem("serverUrl", serverUrl);
+  }, [serverUrl]);
+
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -92,6 +113,10 @@ export const SimulationProvider = ({ children }: { children: React.ReactNode }) 
         startNetwork,
         stopNetwork,
         restartNetwork,
+        clientUrl,
+        setClientUrl,
+        serverUrl,
+        setServerUrl
       } }
     >
       { children }

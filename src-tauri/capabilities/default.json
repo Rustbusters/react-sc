@@ -36,6 +36,9 @@
       "allow": [
         "$APPDATA/history/**"
       ]
-    }
+    },
+    "opener:default",
+    "opener:allow-default-urls",
+    "deep-link:default"
   ]
 }

@@ -3,8 +3,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AlertOctagon, PlusCircle, Trash2, X } from "lucide-react";
+import { AlertOctagon, Link, PlusCircle, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { useSimulation } from "@/components/SimulationContext.tsx";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 
 type NodeInfo = {
@@ -46,6 +48,7 @@ interface NodeDetailsProps {
 const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
   const [nodeData, setNodeData] = useState<NodeInfo | null>(null);
   const [newNeighbor, setNewNeighbor] = useState<string>("");
+  const { clientUrl, serverUrl } = useSimulation();
 
   // 📌 Funzione per recuperare i dettagli di un nodo
   const fetchNodeDetails = useCallback(async () => {
@@ -148,6 +151,16 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
     }
   };
 
+  const openExternalLink = async (url: string) => {
+    try {
+      console.log("Opening URL:", url);
+      await openUrl(url);
+    } catch (error) {
+      console.error("Error opening URL:", error);
+      toast.error("Impossibile aprire il link.");
+    }
+  };
+
   if (!nodeData) return <p className="text-center">Caricamento...</p>;
 
   return (
@@ -159,9 +172,21 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
             { nodeData.node_type }
           </span>
         </h2>
-        <Button variant="ghost" size="icon" onClick={ onClose }>
-          <X size={ 20 }/>
-        </Button>
+
+        <div className="flex items-center">
+          {
+            nodeData && (nodeData.node_type === "Client" || nodeData.node_type === "Server") && (
+              <Button variant="ghost" size="icon"
+                      onClick={ () => openExternalLink(nodeData.node_type === "Client" ? clientUrl : serverUrl) }>
+                <Link/>
+              </Button>
+            )
+          }
+
+          <Button variant="ghost" size="icon" onClick={ onClose }>
+            <X size={ 20 }/>
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">

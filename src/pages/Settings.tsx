@@ -10,6 +10,8 @@ import { useSimulation } from "@/components/SimulationContext";
 import { Input } from "@/components/ui/input.tsx";
 import { Label } from "@/components/ui/label.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
+import { Separator } from "@/components/ui/separator.tsx";
+import { useTheme } from "@/components/theme-provider.tsx";
 
 const LAST_CONFIG_FILE = "last_config.txt";
 
@@ -21,7 +23,7 @@ interface ConfigFile {
 }
 
 const Settings = () => {
-  const { status } = useSimulation();
+  const { status, clientUrl, setClientUrl, serverUrl, setServerUrl } = useSimulation();
   const [defaultConfigs, setDefaultConfigs] = useState<ConfigFile[]>([]);
   const [historyConfigs, setHistoryConfigs] = useState<ConfigFile[]>([]);
   const [configPath, setConfigPath] = useState<string>("");
@@ -34,6 +36,8 @@ const Settings = () => {
   const [discoveryIntervalSent, setDiscoveryIntervalSent] = useState<boolean>(true);
 
   const [strict, setStrict] = useState<boolean>(false);
+
+  const { theme, setTheme, richColors, setRichColors } = useTheme();
 
   const getLastConfigFilePath = async (): Promise<string> => {
     const historyDir = await invoke<string>("get_history_dir");
@@ -146,10 +150,15 @@ const Settings = () => {
     }
   };
 
+  // ─── Update Settings ────────────────────────────────────────────────────────────
   useEffect(() => {
     localStorage.setItem("maxMessages", maxMessages.toString());
     window.dispatchEvent(new Event("storage"));
   }, [maxMessages]);
+
+  useEffect(() => {
+    localStorage.setItem("richColors", String(richColors));
+  }, [richColors]);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -187,124 +196,162 @@ const Settings = () => {
 
 
   return (
-    <div className="p-6 max-w-3xl mx-auto grid grid-cols-3 gap-4">
-      <div className="col-span-1 border-r pr-4">
-        <h2 className="text-lg font-semibold mb-2">Default Configurations</h2>
-        <div className="space-y-2">
-          { defaultConfigs.map((config) => (
-            <Button
-              key={ config.id }
-              variant="ghost"
-              className="w-full flex justify-start"
-              onClick={ () => handleLoadConfig(config.path) }
-              disabled={ status === "Running" }
-            >
-              <File className="mr-2 w-4 h-4"/>
-              { config.name }
+    <div className="p-6 max-w-3xl mx-auto">
+      <div className="w-full grid grid-cols-3 gap-4">
+        <div className="col-span-1 border-r pr-4">
+          <h2 className="text-lg font-semibold mb-2">Default Configurations</h2>
+          <div className="space-y-2">
+            { defaultConfigs.map((config) => (
+              <Button
+                key={ config.id }
+                variant="ghost"
+                className="w-full flex justify-start"
+                onClick={ () => handleLoadConfig(config.path) }
+                disabled={ status === "Running" }
+              >
+                <File className="mr-2 w-4 h-4"/>
+                { config.name }
+              </Button>
+            )) }
+          </div>
+        </div>
+
+        <div className="col-span-2">
+          <h2 className="text-lg font-semibold mb-2">Carica Configurazione</h2>
+          <div className="flex space-x-2">
+            <Input
+              value={ configPath }
+              onChange={ (e) => setConfigPath(e.target.value) }
+              placeholder="Percorso file..."
+              className="flex-1"
+            />
+            <Button onClick={ handleSelectFile }>
+              <FolderOpen className="w-4 h-4"/>
             </Button>
-          )) }
-        </div>
-      </div>
+            <Button onClick={ () => handleLoadConfig(configPath) } disabled={ status === "Running" || alreadyLoaded }>
+              <Upload className="w-4 h-4"/>
+            </Button>
+          </div>
 
-      <div className="col-span-2">
-        <h2 className="text-lg font-semibold mb-2">Carica Configurazione</h2>
-        <div className="flex space-x-2">
-          <Input
-            value={ configPath }
-            onChange={ (e) => setConfigPath(e.target.value) }
-            placeholder="Percorso file..."
-            className="flex-1"
-          />
-          <Button onClick={ handleSelectFile }>
-            <FolderOpen className="w-4 h-4"/>
-          </Button>
-          <Button onClick={ () => handleLoadConfig(configPath) } disabled={ status === "Running" || alreadyLoaded }>
-            <Upload className="w-4 h-4"/>
-          </Button>
-        </div>
+          {/* Cronologia */ }
+          <h2 className="text-lg font-semibold mt-6 mb-2">Cronologia</h2>
+          <div className="space-y-2 max-h-72 overflow-y-auto">
+            { historyConfigs.map((config) => (
+              <div key={ config.id }
+                   className="flex justify-between items-center p-3 border rounded-lg shadow-sm bg-white">
+                <div className="grow truncate text-ellipsis">
+                  <p className="font-medium">{ config.name }</p>
+                  <p className="text-xs text-gray-500">{ new Date(config.timestamp * 1000).toLocaleString() }</p>
+                </div>
 
-        {/* Cronologia */ }
-        <h2 className="text-lg font-semibold mt-6 mb-2">Cronologia</h2>
-        <div className="space-y-2 max-h-72 overflow-y-auto">
-          { historyConfigs.map((config) => (
-            <div key={ config.id }
-                 className="flex justify-between items-center p-3 border rounded-lg shadow-sm bg-white">
-              <div className="grow truncate text-ellipsis">
-                <p className="font-medium">{ config.name }</p>
-                <p className="text-xs text-gray-500">{ new Date(config.timestamp * 1000).toLocaleString() }</p>
+                <div className="flex flex-row gap-2">
+                  <Button size="sm" variant="ghost" onClick={ () => handleLoadConfig(config.path) }
+                          disabled={ status === "Running" }>
+                    <Upload className="w-4 h-4"/>
+                  </Button>
+                  <Button size="sm" variant="destructive" onClick={ () => handleDeleteConfig(config.path) }>
+                    <Trash className="w-4 h-4"/>
+                  </Button>
+                </div>
               </div>
-
-              <div className="flex flex-row gap-2">
-                <Button size="sm" variant="ghost" onClick={ () => handleLoadConfig(config.path) }
-                        disabled={ status === "Running" }>
-                  <Upload className="w-4 h-4"/>
-                </Button>
-                <Button size="sm" variant="destructive" onClick={ () => handleDeleteConfig(config.path) }>
-                  <Trash className="w-4 h-4"/>
-                </Button>
-              </div>
-            </div>
-          )) }
+            )) }
+          </div>
         </div>
-      </div>
 
-      {/* Max Messages Setting */ }
-      <div className="space-y-2">
-        <Label htmlFor="maxMessages">Max Log Messages</Label>
-        <Input
-          id="maxMessages"
-          type="number"
-          value={ maxMessages }
-          onChange={ (e) => {
-            const value = parseInt(e.target.value, 10);
-            if (value > 0) {
-              setMaxMessages(value);
-            } else {
-              toast.error("Value must be greater than 0");
-            }
-          } }
-          className="w-full"
-        />
-      </div>
-
-      {/* Discovery Interval Setting */ }
-      <div className="space-y-2">
-        <Label htmlFor="discoveryInterval">Discovery Interval (seconds)</Label>
-        <div className="flex flex-row gap-2">
+        {/* Max Messages Setting */ }
+        <div className="space-y-2">
+          <Label htmlFor="maxMessages">Max Log Messages</Label>
           <Input
-            id="discoveryInterval"
+            id="maxMessages"
             type="number"
-            value={ discoveryInterval === 0 ? "" : discoveryInterval }
-            placeholder="0 = Default"
-            disabled={ status === "Running" }
+            value={ maxMessages }
             onChange={ (e) => {
               const value = parseInt(e.target.value, 10);
-              if (!isNaN(value)) {
-                if (value >= 0) {
-                  if (value !== discoveryInterval) {
-                    setDiscoveryInterval(value);
-                    setDiscoveryIntervalSent(false);
-                  }
-                } else {
-                  toast.error("Value must be greater than or equal to 0");
-                }
+              if (value > 0) {
+                setMaxMessages(value);
+              } else {
+                toast.error("Value must be greater than 0");
               }
             } }
-            className="flex-1"
+            className="w-full"
           />
-          <Button onClick={ () => {
-            invoke("set_discovery_interval", { interval: discoveryInterval })
-            setDiscoveryIntervalSent(true);
-          } }
-                  disabled={ discoveryIntervalSent || status === "Running" }>
-            <CircleCheck/>
-          </Button>
+        </div>
+
+        {/* Discovery Interval Setting */ }
+        <div className="space-y-2">
+          <Label htmlFor="discoveryInterval">Discovery Interval (seconds)</Label>
+          <div className="flex flex-row gap-2">
+            <Input
+              id="discoveryInterval"
+              type="number"
+              value={ discoveryInterval === 0 ? "" : discoveryInterval }
+              placeholder="0 = Default"
+              disabled={ status === "Running" }
+              onChange={ (e) => {
+                const value = parseInt(e.target.value, 10);
+                if (!isNaN(value)) {
+                  if (value >= 0) {
+                    if (value !== discoveryInterval) {
+                      setDiscoveryInterval(value);
+                      setDiscoveryIntervalSent(false);
+                    }
+                  } else {
+                    toast.error("Value must be greater than or equal to 0");
+                  }
+                }
+              } }
+              className="flex-1"
+            />
+            <Button onClick={ () => {
+              invoke("set_discovery_interval", { interval: discoveryInterval })
+              setDiscoveryIntervalSent(true);
+            } }
+                    disabled={ discoveryIntervalSent || status === "Running" }>
+              <CircleCheck/>
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center justify-around">
+          <Label htmlFor="strictMode">Strict Mode in Validation</Label>
+          <Switch id="strictMode" checked={ strict } onCheckedChange={ toggleStrictMode }/>
+        </div>
+
+        {/* Client URL */ }
+        <div className="space-y-2">
+          <Label htmlFor="clientUrl">Client URL</Label>
+          <Input
+            id="clientUrl"
+            type="text"
+            value={ clientUrl }
+            onChange={ (e) => setClientUrl(e.target.value) }
+            className="w-full"
+          />
+        </div>
+
+        {/* Server URL */ }
+        <div className="space-y-2">
+          <Label htmlFor="serverUrl">Server URL</Label>
+          <Input
+            id="serverUrl"
+            type="text"
+            value={ serverUrl }
+            onChange={ (e) => setServerUrl(e.target.value) }
+            className="w-full"
+          />
         </div>
       </div>
 
-      <div className="flex flex-col items-center justify-around">
-        <Label htmlFor="strictMode">Strict Mode in Validation</Label>
-        <Switch id="strictMode" checked={ strict } onCheckedChange={ toggleStrictMode }/>
+      <Separator className="my-6"/>
+
+      <h2 className="text-lg font-semibold pb-2">Theme</h2>
+      <div className="w-full grid grid-cols-3 gap-4">
+
+
+        <div className="flex flex-row items-center justify-start gap-4">
+          <Label htmlFor="richColors">Toast Colorati</Label>
+          <Switch id="richColors" checked={ richColors } onCheckedChange={ setRichColors }/>
+        </div>
       </div>
     </div>
   );

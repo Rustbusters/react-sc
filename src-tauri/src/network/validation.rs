@@ -16,6 +16,7 @@ use std::collections::HashSet;
 pub fn validate_graph(graph: &GraphState, strict: bool) -> Result<(), NetworkError> {
     validate_connected_graph(graph)?;
     validate_bidirectionality(graph)?;
+    validate_no_multiple_connections(graph)?;
     validate_clients_and_servers(graph)?;
     validate_no_duplicate_ids(graph)?;
     validate_no_host_direct_connections(graph)?;
@@ -65,6 +66,22 @@ fn validate_bidirectionality(graph: &GraphState) -> Result<(), NetworkError> {
             {
                 return Err(NetworkError::ValidationError(format!(
                     "The graph is not bidirectional: {} -> {} exists, but not vice versa.",
+                    node, neighbor
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Check for multiple connections between nodes
+fn validate_no_multiple_connections(graph: &GraphState) -> Result<(), NetworkError> {
+    for (node, neighbors) in &graph.adjacency {
+        let mut seen = HashSet::new();
+        for &neighbor in neighbors {
+            if !seen.insert(neighbor) {
+                return Err(NetworkError::ValidationError(format!(
+                    "Node {} has multiple connections to node {}.",
                     node, neighbor
                 )));
             }

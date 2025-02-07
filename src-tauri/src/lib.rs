@@ -27,6 +27,8 @@ pub fn run() {
     let state = Arc::new(Mutex::new(NetworkState::new()));
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .setup({
