@@ -17,7 +17,7 @@ use std::fs;
 use std::thread::JoinHandle;
 use std::time::Duration;
 use tauri::AppHandle;
-use wg_2024::config::{Config, Drone};
+use wg_2024::config::Config;
 use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::network::NodeId;
 use wg_2024::packet::Packet;
@@ -35,6 +35,7 @@ pub struct GraphState {
 #[derive(Debug, Clone)]
 pub struct NodeMetadata {
     pub node_type: NodeType,
+    pub node_group: Option<String>,
     pub pdr: f32,
     pub crashed: bool, // TODO: is this needed?
 }
@@ -304,6 +305,7 @@ impl NetworkState {
                 drone.id,
                 NodeMetadata {
                     node_type: NodeType::Drone,
+                    node_group: None,
                     pdr: drone.pdr,
                     crashed: false,
                 },
@@ -322,6 +324,7 @@ impl NetworkState {
                 client.id,
                 NodeMetadata {
                     node_type: NodeType::Client,
+                    node_group: None,
                     pdr: 0.0,
                     crashed: false,
                 },
@@ -340,6 +343,7 @@ impl NetworkState {
                 server.id,
                 NodeMetadata {
                     node_type: NodeType::Server,
+                    node_group: None,
                     pdr: 0.0,
                     crashed: false,
                 },

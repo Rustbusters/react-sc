@@ -27,7 +27,6 @@ export function ModeToggle() {
               theme === "dark" ? "opacity-100 scale-100" : "opacity-0 scale-90"
             }` }
           />
-          {/* TODO: aggiungere l'icona del system */}
           <span className="sr-only">Toggle theme</span>
         </Button>
       </DropdownMenuTrigger>

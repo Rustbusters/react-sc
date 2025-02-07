@@ -7,11 +7,12 @@ import { AlertOctagon, Link, PlusCircle, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { useSimulation } from "@/components/SimulationContext.tsx";
 import { openUrl } from "@tauri-apps/plugin-opener";
-
+import { Badge } from "@/components/ui/badge.tsx";
 
 type NodeInfo = {
   node_id: number;
   node_type: "Drone" | "Client" | "Server";
+  node_group: String;
   connections: number[];
   metrics: DroneMetrics | HostMetrics | EmptyMetrics;
 };
@@ -50,7 +51,7 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
   const [newNeighbor, setNewNeighbor] = useState<string>("");
   const { clientUrl, serverUrl, pollingInterval } = useSimulation();
 
-  // 📌 Funzione per recuperare i dettagli di un nodo
+  // 📌 Function to fetch node details
   const fetchNodeDetails = useCallback(async () => {
     try {
       const response = await invoke<NodeInfo>("get_node_info", { nodeId: Number(nodeId) });
@@ -67,7 +68,7 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
     return () => clearInterval(interval);
   }, [fetchNodeDetails]);
 
-  // 📌 Aggiunta di un vicino
+  // 📌 Add a neighbor
   const addNeighbor = async () => {
     if (!newNeighbor.trim()) return;
     try {
@@ -88,7 +89,7 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
     }
   };
 
-  // 📌 Rimozione di un vicino
+  // 📌 Remove a neighbor
   const removeNeighbor = async (neighborId: number) => {
     try {
       await invoke("remove_neighbor", { nodeId: Number(nodeId), neighborId });
@@ -107,7 +108,7 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
     }
   };
 
-  // 📌 Crash di un drone
+  // 📌 Crash a drone
   const crashNode = async () => {
     try {
       await invoke("crash_command", { droneId: Number(nodeId) });
@@ -125,7 +126,7 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
     }
   };
 
-  // 📌 Modifica del PDR per i droni
+  // 📌 Update the PDR for drones
   const updatePdr = async (newPdr: number) => {
     try {
       await invoke("send_set_pdr_command", { droneId: Number(nodeId), pdr: Math.round(newPdr * 100) });
@@ -157,18 +158,18 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
       await openUrl(url);
     } catch (error) {
       console.error("Error opening URL:", error);
-      toast.error("Impossibile aprire il link.");
+      toast.error("Unable to open the link.");
     }
   };
 
-  if (!nodeData) return <p className="text-center">Caricamento...</p>;
+  if (!nodeData) return <p className="text-center">Loading...</p>;
 
   return (
     <div
       className="fixed right-0 top-0 h-full w-[400px] bg-background shadow-xl flex flex-col border-l">
       <div className="p-4 flex justify-between items-center border-b sticky top-0">
         <h2 className="text-xl font-semibold flex items-center">
-          Dettagli Nodo #{ nodeId }
+          Node Details #{ nodeId }
           <span className={ `ml-3 px-2 py-1 text-sm rounded-md ${ getTypeColor(nodeData.node_type) }` }>
             { nodeData.node_type }
           </span>
@@ -192,7 +193,10 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         <div>
-          <Label className="text-muted-foreground">Vicini</Label>
+          <div className="flex items-center justify-between">
+            <Label className="text-muted-foreground">Neighbors</Label>
+            { nodeData.node_group && (<Badge variant="default">{ nodeData.node_group }</Badge>) }
+          </div>
           <div className="mt-2 space-y-2">
             { nodeData.connections.length > 0 ? (
               nodeData.connections.map((neighbor) => (
@@ -204,14 +208,14 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
                 </div>
               ))
             ) : (
-              <p className="text-gray-500">Nessun vicino</p>
+              <p className="text-gray-500">No neighbors</p>
             ) }
           </div>
           <div className="flex items-center mt-3 space-x-2">
-            <Input type="text" placeholder="ID nuovo vicino" value={ newNeighbor }
+            <Input type="text" placeholder="New neighbor ID" value={ newNeighbor }
                    onChange={ (e) => setNewNeighbor(e.target.value) }/>
             <Button onClick={ addNeighbor } className="flex items-center">
-              <PlusCircle size={ 16 } className="mr-1"/> Aggiungi
+              <PlusCircle size={ 16 } className="mr-1"/> Add
             </Button>
           </div>
         </div>
@@ -232,7 +236,7 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
         ) }
 
         <div>
-          <Label className="text-muted-foreground">Statistiche</Label>
+          <Label className="text-muted-foreground">Statistics</Label>
           <pre
             className="relative bg-muted p-3 rounded-md text-sm">{ JSON.stringify(nodeData.metrics, null, 2) }
           </pre>

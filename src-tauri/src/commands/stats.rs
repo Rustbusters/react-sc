@@ -246,6 +246,7 @@ use serde::{Deserialize, Serialize};
 pub struct NodeInfo {
     pub node_id: NodeId,
     pub node_type: String,
+    pub node_group: Option<String>,
     pub connections: Vec<NodeId>,
     pub metrics: NodeMetrics,
 }
@@ -296,6 +297,8 @@ pub fn get_node_info(
         NodeType::Client => "Client",
         NodeType::Server => "Server",
     };
+    
+    let node_group = metadata.node_group.clone();
 
     let metrics = match metadata.node_type {
         NodeType::Drone => {
@@ -332,6 +335,7 @@ pub fn get_node_info(
     Ok(NodeInfo {
         node_id,
         node_type: node_type.to_string(),
+        node_group,
         connections,
         metrics,
     })

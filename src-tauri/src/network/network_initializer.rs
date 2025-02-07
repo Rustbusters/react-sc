@@ -1,11 +1,18 @@
 use crate::error::NetworkError;
 use crate::network::state::NetworkState;
+use ap2024_unitn_cppenjoyers_drone::CppEnjoyersDrone;
 use client::RustbustersClient;
 use common_utils::{HostCommand, HostEvent};
 use crossbeam_channel::{unbounded, Receiver, Sender};
+use fungi_drone::FungiDrone;
+use lockheedrustin_drone::LockheedRustin;
 use log::info;
+use rust_do_it::RustDoIt;
+use rust_roveri::RustRoveri;
+use rustastic_drone::RustasticDrone;
 use rustbusters_drone::RustBustersDrone;
-use serde::de::Error;
+use rusteze_drone::RustezeDrone;
+use rusty_drones::RustyDrone;
 use server::utils::traits::Runnable;
 use server::{RustBustersServer, RustBustersServerController};
 use std::collections::HashMap;
@@ -15,6 +22,8 @@ use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::drone::Drone;
 use wg_2024::network::NodeId;
 use wg_2024::packet::Packet;
+use wg_2024_rust::drone::RustDrone;
+use RF_drone::RustAndFurious;
 
 /// A trait representing a generic drone implementation
 /// that can be 'run' in its own thread. Because you call
@@ -22,6 +31,7 @@ use wg_2024::packet::Packet;
 /// you want to move the drone object across threads.
 pub trait DroneRunnable: Send {
     fn run(&mut self);
+    fn drone_type(&self) -> &'static str;
 }
 
 /// Blanket impl: any `T` that implements `wg_2024::drone::Drone + Send`
@@ -29,6 +39,14 @@ pub trait DroneRunnable: Send {
 impl<T: Drone + Send> DroneRunnable for T {
     fn run(&mut self) {
         <Self as Drone>::run(self);
+    }
+
+    /// Returns the type name of the drone implementation.
+    fn drone_type(&self) -> &'static str {
+        std::any::type_name::<T>()
+            .split("::")
+            .last()
+            .unwrap_or("Unknown")
     }
 }
 
@@ -78,7 +96,20 @@ macro_rules! drone_factories {
 pub fn initialize_drones(state: &mut NetworkState) -> Result<(), NetworkError> {
     // Example: build an array with just one drone factory for demonstration
     // Ensure `RustyDrone` is actually `Send`.
-    let factories = drone_factories![RustBustersDrone]; // RustyDrone, LockheedRustin
+    let drone_factories: Vec<DroneFactory> = drone_factories![
+        // RustBustersDrone,
+        RustyDrone,
+        LockheedRustin,
+        FungiDrone,
+        RustasticDrone,
+        RustezeDrone,
+        RustDoIt,
+        RustRoveri,
+        RustAndFurious,
+        CppEnjoyersDrone,
+        RustDrone,
+    ];
+    let mut factory_index = 0;
 
     let config = state
         .initial_config
@@ -136,13 +167,10 @@ pub fn initialize_drones(state: &mut NetworkState) -> Result<(), NetworkError> {
         }
 
         // Pick a drone factory. In a real scenario, match a config field if needed.
-        let build_fn = factories.get(0).ok_or_else(|| {
-            NetworkError::ConfigParseError(toml::de::Error::custom("No drone factory specified"))
-        })?;
+        let create_drone = &drone_factories[factory_index];
+        factory_index = (factory_index + 1) % drone_factories.len();
 
-        // Create a new drone using the factory
-        // If RustyDrone is truly `Send`, this will compile.
-        let new_drone = build_fn(
+        let new_drone = create_drone(
             drone.id,
             evt_tx, // The drone can send events here
             cmd_rx, // The drone receives commands here
@@ -150,6 +178,14 @@ pub fn initialize_drones(state: &mut NetworkState) -> Result<(), NetworkError> {
             packet_send,
             drone.pdr,
         );
+
+        state
+            .graph
+            .node_info
+            .entry(drone.id)
+            .and_modify(|node_info| {
+                node_info.node_group = Some(new_drone.drone_type().to_string());
+            });
 
         // Now we can spawn the drone in a new thread
         // because `Box<dyn DroneRunnable + Send>` is `Send`.

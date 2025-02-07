@@ -1,15 +1,12 @@
 use crate::error::NetworkError;
-use crate::network::state::{GraphState, NetworkState, NetworkStatus, NodeMetadata, NodeType};
+use crate::network::state::{NetworkState, NetworkStatus, NodeMetadata, NodeType};
 use common_utils::HostCommand;
 use log::{error, info};
 use parking_lot::Mutex;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::State as TauriState;
 use tauri::{AppHandle, Emitter};
 use wg_2024::controller::DroneCommand;
-use wg_2024::network::NodeId;
 
 /// Starts the network by initializing the network state and starting all nodes.
 #[tauri::command]
@@ -59,6 +56,22 @@ pub fn stop_network(
 
     info!("Stopping the network...");
 
+    for (&node_id, neighbors) in &net_state.graph.adjacency.clone() {
+        for &neighbor_id in neighbors {
+            let node_type = net_state
+                .get_node_type(node_id)
+                .ok_or_else(|| NetworkError::NodeNotFound(node_id.to_string()))?;
+            net_state
+                .send_remove_sender_command(node_id, &node_type, neighbor_id)
+                .map_err(|err| {
+                    NetworkError::CommandSendError(format!(
+                        "Failed to send 'RemoveSender' command to node {}: {}",
+                        node_id, err
+                    ))
+                })?;
+        }
+    }
+
     // Drones
     for (drone_id, (sender, _receiver)) in &net_state.drones_controller_channels {
         sender.send(DroneCommand::Crash).map_err(|_| {
@@ -92,16 +105,17 @@ pub fn stop_network(
         info!("Sent 'Stop' command to server {}", server_id);
     }
 
+    // sleep 1 sec
+    std::thread::sleep(std::time::Duration::from_secs(1));
+    net_state.drones_controller_channels.clear();
+    net_state.inter_node_channels.clear();
+    net_state.graph.node_info.clear();
+    net_state.graph.adjacency.clear();
+
     for (node_id, handle) in net_state.node_threads.drain() {
         info!("Attempting to join thread for node {}", node_id);
-        if let Err(e) = handle.join() {
-            error!(
-                "Failed to join thread for node {}: {:?}. Force-removing.",
-                node_id, e
-            );
-        } else {
-            info!("Thread for node {} stopped successfully", node_id);
-        }
+        handle.join().unwrap();
+        info!("Thread for node {} stopped successfully", node_id);
     }
 
     net_state.clear_simulation();
@@ -122,6 +136,7 @@ pub fn stop_network(
 
 // =============================================================================
 use serde_json::{json, Value};
+use wg_2024::network::NodeId;
 
 #[tauri::command]
 pub fn get_network_nodes(

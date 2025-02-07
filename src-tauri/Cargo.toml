@@ -31,14 +31,24 @@ dotenv = "0.15"
 
 
 wg_2024 = { git = "https://github.com/WGL-2024/WGL_repo_2024.git", features = ["serialize"] }
-rustbusters-drone = { git = "ssh://github.com/Rustbusters/drone.git" }
 client = { git = "https://github.com/Rustbusters/client.git" }
 #client = { path = "../../client" }
 server = { git = "https://github.com/Rustbusters/server.git" }
 #server = { path = "../../server" }
 common-utils = { git = "https://github.com/Rustbusters/common-utils.git" }
-rusty_drones = { git = "https://github.com/rusty-drone-2024/rusty-drone.git" }
+
+# DRONES
+rustbusters-drone = { git = "ssh://github.com/Rustbusters/drone.git" } # TODO: remove Rustbusters drone
+rusty_drones = { git = "https://github.com/rusty-drone-2024/rusty-drone" }
 lockheedrustin-drone = { git = "https://github.com/Lockheed-Rustin/drone.git" }
+fungi_drone = { git = "https://github.com/Fungi-B-D/Fungi-Drone.git" }
+rustastic-drone = { git = "https://github.com/Rustastic/RustasticDrone.git" }
+rusteze_drone = { git = "https://github.com/Rusteze-AP/drone.git" }
+rust_do_it = { git = "https://github.com/RustDoIt/Drone.git" }
+rust-roveri = { git = "https://github.com/RustRoveri/rust-roveri.git" }
+RF_drone = { git = "https://github.com/RustAndFurious/RF_drone.git" }
+ap2024_unitn_cppenjoyers_drone = { git = "https://github.com/Cpp-enjoyers/drone.git" }
+wg_2024-rust = { git = "https://github.com/LuigiMiazzo17/unitn-advancedProgramming-WGL_2024-drone.git" }
 
 thiserror = "2.0.3"
 parking_lot = "0.12"
