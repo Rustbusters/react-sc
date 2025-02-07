@@ -23,7 +23,9 @@ interface ConfigFile {
 }
 
 const Settings = () => {
-  const { status, clientUrl, setClientUrl, serverUrl, setServerUrl } = useSimulation();
+  const {
+    status, clientUrl, setClientUrl, serverUrl, setServerUrl, pollingInterval, setPollingInterval
+  } = useSimulation();
   const [defaultConfigs, setDefaultConfigs] = useState<ConfigFile[]>([]);
   const [historyConfigs, setHistoryConfigs] = useState<ConfigFile[]>([]);
   const [configPath, setConfigPath] = useState<string>("");
@@ -231,7 +233,7 @@ const Settings = () => {
 
           {/* Cronologia */ }
           <h2 className="text-lg font-semibold mt-6 mb-2">Cronologia</h2>
-          <div className="space-y-2 max-h-72 overflow-y-auto">
+          <div className="space-y-2 max-h-72 overflow-y-auto select-none">
             { historyConfigs.map((config) => (
               <div key={ config.id }
                    className="flex justify-between items-center p-3 border rounded-lg shadow-sm">
@@ -337,6 +339,26 @@ const Settings = () => {
             type="text"
             value={ serverUrl }
             onChange={ (e) => setServerUrl(e.target.value) }
+            className="w-full"
+          />
+        </div>
+
+
+        {/* Polling interval */ }
+        <div className="space-y-2">
+          <Label htmlFor="maxMessages">Polling interval</Label>
+          <Input
+            id="pollingInterval"
+            type="number"
+            value={ pollingInterval }
+            onChange={ (e) => {
+              const value = parseInt(e.target.value, 10);
+              if (value > 0) {
+                setPollingInterval(value);
+              } else {
+                toast.error("Value must be greater than 0");
+              }
+            } }
             className="w-full"
           />
         </div>

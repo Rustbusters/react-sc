@@ -6,6 +6,7 @@ use serde_json::json;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 use tauri::State;
 use wg_2024::controller::DroneEvent;
 use wg_2024::network::NodeId;
@@ -116,6 +117,10 @@ pub fn get_new_messages(
     let state = state.lock();
     let total_messages = state.received_messages.len();
     let start_index = total_messages.saturating_sub(max_messages).max(last_id);
+
+    if start_index >= total_messages {
+        return Vec::new();
+    }
 
     state.received_messages[start_index..]
         .iter()
@@ -418,4 +423,36 @@ pub fn get_drone_metrics(
         .get(&node_id)
         .cloned()
         .ok_or_else(|| NetworkError::NodeNotFound(node_id.to_string()))
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct HostStats {
+    latencies: Vec<Duration>,
+    number_of_fragment_sent: u64,
+}
+
+#[tauri::command]
+pub fn get_host_metrics(
+    state: State<Arc<Mutex<NetworkState>>>,
+    node_id: NodeId,
+) -> Result<HostStats, NetworkError> {
+    let state = state.lock();
+    let latencies = state
+        .metrics
+        .host_metrics
+        .get(&node_id)
+        .map(|m| m.latencies.clone())
+        .ok_or_else(|| NetworkError::NodeNotFound(node_id.to_string()))?;
+
+    let number_of_fragment_sent = state
+        .metrics
+        .host_metrics
+        .get(&node_id)
+        .map(|m| m.number_of_fragments_sent())
+        .ok_or_else(|| NetworkError::NodeNotFound(node_id.to_string()))?;
+
+    Ok(HostStats {
+        latencies,
+        number_of_fragment_sent,
+    })
 }

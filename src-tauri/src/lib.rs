@@ -8,11 +8,11 @@ use crate::commands::{
     add_neighbor, config_remove_edge, config_remove_node, crash_command, delete_history_config,
     get_all_drones_statistics, get_config, get_default_configs, get_default_configs_dir,
     get_discovery_interval, get_drone_metrics, get_drone_statistics, get_global_statistics,
-    get_graph, get_history_configs, get_history_dir, get_host_stats, get_network_infos,
-    get_network_nodes, get_network_status, get_new_messages, get_node_info, get_overview_metrics,
-    get_strict_mode, load_config, remove_neighbor, send_packet, send_set_pdr_command,
-    set_discovery_interval, set_strict_mode, start_network, start_repeated_sending, stop_network,
-    stop_repeated_sending,
+    get_graph, get_history_configs, get_history_dir, get_host_metrics, get_host_stats,
+    get_network_infos, get_network_nodes, get_network_status, get_new_messages, get_node_info,
+    get_overview_metrics, get_strict_mode, load_config, remove_neighbor, send_packet,
+    send_set_pdr_command, set_discovery_interval, set_strict_mode, start_network,
+    start_repeated_sending, stop_network, stop_repeated_sending,
 };
 use crate::listener::Listener;
 use crate::network::state::NetworkState;
@@ -101,6 +101,7 @@ pub fn run() {
             get_host_stats,
             get_overview_metrics,
             get_drone_metrics,
+            get_host_metrics,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -15,5 +15,5 @@ pub use simulation::{
 };
 pub use stats::{
     get_all_drones_statistics, get_drone_statistics, get_global_statistics, get_host_stats,
-    get_network_infos, get_new_messages, get_node_info, get_overview_metrics, get_drone_metrics
+    get_network_infos, get_new_messages, get_node_info, get_overview_metrics, get_drone_metrics, get_host_metrics
 };

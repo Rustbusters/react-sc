@@ -48,7 +48,7 @@ interface NodeDetailsProps {
 const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
   const [nodeData, setNodeData] = useState<NodeInfo | null>(null);
   const [newNeighbor, setNewNeighbor] = useState<string>("");
-  const { clientUrl, serverUrl } = useSimulation();
+  const { clientUrl, serverUrl, pollingInterval } = useSimulation();
 
   // 📌 Funzione per recuperare i dettagli di un nodo
   const fetchNodeDetails = useCallback(async () => {
@@ -63,7 +63,7 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
 
   useEffect(() => {
     fetchNodeDetails();
-    const interval = setInterval(fetchNodeDetails, 5000);
+    const interval = setInterval(fetchNodeDetails, pollingInterval);
     return () => clearInterval(interval);
   }, [fetchNodeDetails]);
 

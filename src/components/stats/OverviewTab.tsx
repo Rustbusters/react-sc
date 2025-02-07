@@ -3,26 +3,52 @@ import { invoke } from "@tauri-apps/api/core";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { toast } from "sonner";
 import PacketTypeBarChart from "@/components/graphs/PacketTypeBarChart.tsx";
+import HeatmapGraph from "@/components/graphs/Heatmap.tsx";
+import { useSimulation } from "@/components/SimulationContext.tsx";
+
+interface NetworkNode {
+  id: string;
+  type: "Drone" | "Client" | "Server";
+}
+
 
 const OverviewTab = () => {
   const [data, setData] = useState<OverviewMetrics | null>(null);
+  const [nodeTypes, setNodeTypes] = useState<Record<string, "Drone" | "Client" | "Server">>({});
   const [loading, setLoading] = useState(true);
+  const { pollingInterval } = useSimulation();
 
   useEffect(() => {
     const fetchMetrics = async () => {
       try {
         const response: OverviewMetrics = await invoke("get_overview_metrics");
         setData(response);
-        setLoading(false);
       } catch (error) {
         console.error("Error fetching metrics:", error);
         toast.error("Error fetching metrics.");
+      } finally {
         setLoading(false);
       }
     };
 
+    const fetchNodeTypes = async () => {
+      try {
+        const response: NetworkNode[] = await invoke("get_network_nodes");
+        const typesMap: Record<string, "Drone" | "Client" | "Server"> = {};
+        response.forEach((node) => {
+          typesMap[node.id] = node.type;
+        });
+        setNodeTypes(typesMap);
+      } catch (error) {
+        console.error("Error fetching network nodes:", error);
+        toast.error("Error fetching network nodes.");
+      }
+    };
+
     fetchMetrics();
-    const interval = setInterval(fetchMetrics, 5000);
+    fetchNodeTypes();
+
+    const interval = setInterval(fetchMetrics, pollingInterval);
     return () => clearInterval(interval);
   }, []);
 
@@ -58,18 +84,18 @@ const OverviewTab = () => {
       </div>
 
       {/* Heatmap and Breakdown by Type */ }
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-        <Card className="md:col-span-3 p-2">
+      <div className="flex items-start gap-6">
+        <Card className="w-3/5 p-2">
           <CardHeader>
             <CardTitle className="font-semibold">Heatmap</CardTitle>
           </CardHeader>
           <CardContent>
-            {/* <Heatmap data={data.heatmap} width={600} height={300}/> */ }
+            <HeatmapGraph heatmap={ data.heatmap } nodeTypes={ nodeTypes }/>
           </CardContent>
         </Card>
 
         {/* Using the new reusable component */ }
-        <PacketTypeBarChart packetData={ data.packets_by_type }/>
+        <PacketTypeBarChart packetData={ data.packets_by_type } className="w-2/5"/>
       </div>
     </div>
   );

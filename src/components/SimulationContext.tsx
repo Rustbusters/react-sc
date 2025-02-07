@@ -16,6 +16,8 @@ const SimulationContext = createContext<{
   setClientUrl: (url: string) => void;
   serverUrl: string;
   setServerUrl: (url: string) => void;
+  pollingInterval: number;
+  setPollingInterval: (interval: number) => void;
 }>({
   status: "Init",
   isLoading: true,
@@ -30,7 +32,10 @@ const SimulationContext = createContext<{
   },
   serverUrl: "http://127.0.0.1:8080",
   setServerUrl: () => {
-  }
+  },
+  pollingInterval: 5000,
+  setPollingInterval: () => {
+  },
 });
 
 // Custom hook to access the simulation context
@@ -41,6 +46,7 @@ export const SimulationProvider = ({ children }: { children: React.ReactNode }) 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [clientUrl, setClientUrl] = useState<string>(localStorage.getItem("clientUrl") || "http://localhost:7373");
   const [serverUrl, setServerUrl] = useState<string>(localStorage.getItem("serverUrl") || "http://127.0.0.1:8080");
+  const [pollingInterval, setPollingInterval] = useState<number>(Number(localStorage.getItem("pollingInterval")) || 5000);
 
   useEffect(() => {
     localStorage.setItem("clientUrl", clientUrl);
@@ -50,6 +56,9 @@ export const SimulationProvider = ({ children }: { children: React.ReactNode }) 
     localStorage.setItem("serverUrl", serverUrl);
   }, [serverUrl]);
 
+  useEffect(() => {
+    localStorage.setItem("pollingInterval", pollingInterval.toString());
+  }, [pollingInterval]);
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -116,7 +125,9 @@ export const SimulationProvider = ({ children }: { children: React.ReactNode }) 
         clientUrl,
         setClientUrl,
         serverUrl,
-        setServerUrl
+        setServerUrl,
+        pollingInterval,
+        setPollingInterval,
       } }
     >
       { children }

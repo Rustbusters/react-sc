@@ -6,6 +6,8 @@ import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "
 import { CartesianGrid, Line, LineChart, XAxis } from "recharts";
 import { TrendingUp } from "lucide-react";
 import PacketTypeBarChart from "@/components/graphs/PacketTypeBarChart.tsx";
+import { NetworkNode } from "@/pages/NetworkStats.tsx";
+import { useSimulation } from "@/components/SimulationContext.tsx";
 
 interface DroneMetrics {
   drops: number;
@@ -26,16 +28,22 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-const DronesTab = ({ selectedDroneId }: { selectedDroneId: number | null }) => {
+const DronesTab = ({ selectedDroneId }: { selectedDroneId: NetworkNode | null }) => {
   const [metrics, setMetrics] = useState<DroneMetrics | null>(null);
   const [loading, setLoading] = useState(true);
+  const { pollingInterval } = useSimulation();
 
   useEffect(() => {
     if (!selectedDroneId) return;
 
+    if (selectedDroneId.type !== "Drone") {
+      setMetrics(null);
+      return;
+    }
+
     const fetchMetrics = async () => {
       try {
-        const response: DroneMetrics = await invoke("get_drone_metrics", { nodeId: selectedDroneId });
+        const response: DroneMetrics = await invoke("get_drone_metrics", { nodeId: selectedDroneId.id });
         setMetrics(response);
         setLoading(false);
       } catch (error) {
@@ -46,7 +54,7 @@ const DronesTab = ({ selectedDroneId }: { selectedDroneId: number | null }) => {
     };
 
     fetchMetrics();
-    const interval = setInterval(fetchMetrics, 5000);
+    const interval = setInterval(fetchMetrics, pollingInterval);
     return () => clearInterval(interval);
   }, [selectedDroneId]);
 
@@ -78,100 +86,86 @@ const DronesTab = ({ selectedDroneId }: { selectedDroneId: number | null }) => {
   }));
 
   return (
-    <div className="py-6 space-y-6">
+    <div className="py-6 flex gap-4">
       {/* Grid Layout */ }
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Sent vs Dropped Packets Line Chart */ }
-        <Card className="md:col-span-2 md:row-span-3 p-6">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold">MsgFragment sent vs dropped</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={ chartConfig }>
-              <LineChart
-                accessibilityLayer
-                data={ lineChartData }
-                margin={ { left: 12, right: 12 } }
-              >
-                <CartesianGrid vertical={ false }/>
-                <XAxis
-                  dataKey="time"
-                  tickLine={ false }
-                  axisLine={ false }
-                  tickMargin={ 8 }
-                />
-                <ChartTooltip cursor={ false } content={ <ChartTooltipContent/> }/>
-                <Line
-                  dataKey="sent"
-                  type="monotone"
-                  stroke="hsl(var(--chart-1))"
-                  strokeWidth={ 2 }
-                  dot={ false }
-                />
-                <Line
-                  dataKey="dropped"
-                  type="monotone"
-                  stroke="hsl(var(--chart-2))"
-                  strokeWidth={ 2 }
-                  dot={ false }
-                />
-              </LineChart>
-            </ChartContainer>
-          </CardContent>
-          <CardFooter>
-            <div className="flex w-full items-start gap-2 text-sm">
-              <div className="grid gap-2">
-                <div className="flex items-center gap-2 font-medium leading-none">
-                  Sent: { latestMetrics.sent.toLocaleString() } |
-                  Dropped: { latestMetrics.dropped.toLocaleString() } <TrendingUp className="h-4 w-4"/>
-                </div>
-                <div className="text-muted-foreground">
-                  Showing packet trend over time
-                </div>
+      {/* Sent vs Dropped Packets Line Chart */ }
+      <Card className="w-1/2 p-6">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold">MsgFragment sent vs dropped</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ChartContainer config={ chartConfig }>
+            <LineChart
+              accessibilityLayer
+              data={ lineChartData }
+              margin={ { left: 12, right: 12 } }
+            >
+              <CartesianGrid vertical={ false }/>
+              <XAxis
+                dataKey="time"
+                tickLine={ false }
+                axisLine={ false }
+                tickMargin={ 8 }
+              />
+              <ChartTooltip cursor={ false } content={ <ChartTooltipContent/> }/>
+              <Line
+                dataKey="sent"
+                type="monotone"
+                stroke="hsl(var(--chart-1))"
+                strokeWidth={ 2 }
+                dot={ false }
+              />
+              <Line
+                dataKey="dropped"
+                type="monotone"
+                stroke="hsl(var(--chart-2))"
+                strokeWidth={ 2 }
+                dot={ false }
+              />
+            </LineChart>
+          </ChartContainer>
+        </CardContent>
+        <CardFooter>
+          <div className="flex w-full items-start gap-2 text-sm">
+            <div className="grid gap-2">
+              <div className="flex items-center gap-2 font-medium leading-none">
+                Sent: { latestMetrics.sent.toLocaleString() } |
+                Dropped: { latestMetrics.dropped.toLocaleString() } <TrendingUp className="h-4 w-4"/>
+              </div>
+              <div className="text-muted-foreground">
+                Showing packet trend over time
               </div>
             </div>
-          </CardFooter>
-        </Card>
+          </div>
+        </CardFooter>
+      </Card>
 
+      <div className="w-1/2 flex flex-col gap-4">
         {/* Packet Reception Rate */ }
-        <div className="md:col-span-2 space-y-4">
-          <Card className="p-6">
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">Packet Reception Rate</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{ receivedPacketPercentage.toFixed(2) }%</p>
-            </CardContent>
-          </Card>
-
+        <div className="w-full space-y-4">
           {/* Two Side-by-Side Cards: PDR & Shortcuts */ }
           <div className="grid grid-cols-2 gap-4">
-            <Card className="p-4">
-              <CardHeader>
-                <CardTitle className="text-sm font-medium">Packet Delivery Ratio (PDR)</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xl font-bold">{ metrics.current_pdr.toFixed(2) }</p>
-              </CardContent>
-            </Card>
-            <Card className="p-4">
-              <CardHeader>
-                <CardTitle className="text-sm font-medium">Shortcuts Used</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xl font-bold">{ metrics.shortcuts }</p>
-              </CardContent>
-            </Card>
+            <StatCard title="Packet Delivery Ratio (PDR)" value={ metrics.current_pdr.toFixed(2) || "0" }/>
+            <StatCard title="Shortcuts Used" value={ metrics.shortcuts.toLocaleString() }/>
           </div>
         </div>
-      </div>
-
-      {/* Packet Type Breakdown Chart */ }
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-        <PacketTypeBarChart packetData={ metrics.packet_type_counts }/>
+        {/* Packet Type Breakdown Chart */ }
+        <PacketTypeBarChart packetData={ metrics.packet_type_counts } className="col-span-2"/>
       </div>
     </div>
   );
 };
+
+
+const StatCard = ({ title, value }: { title: string; value: string }) => (
+  <Card className="">
+    <CardHeader className="pb-2">
+      <CardTitle className="text-xs font-medium">{ title }</CardTitle>
+    </CardHeader>
+    <CardContent>
+      <p className="text-xl font-semibold">{ value }</p>
+    </CardContent>
+  </Card>
+);
 
 export default DronesTab;

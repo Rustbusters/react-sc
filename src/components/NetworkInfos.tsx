@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { invoke } from "@tauri-apps/api/core";
 import { LaptopIcon, ServerIcon } from "lucide-react";
 import { PiDrone } from "react-icons/pi";
+import { useSimulation } from "@/components/SimulationContext.tsx";
 
 interface NodeInfo {
   node_id: number;
@@ -20,6 +21,7 @@ const NetworkInfos = () => {
   const [networkData, setNetworkData] = useState<NodeInfo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const { pollingInterval } = useSimulation();
 
   const fetchNetworkInfos = async () => {
     try {
@@ -35,7 +37,7 @@ const NetworkInfos = () => {
 
   useEffect(() => {
     fetchNetworkInfos();
-    const interval = setInterval(fetchNetworkInfos, 5000);
+    const interval = setInterval(fetchNetworkInfos, pollingInterval);
     return () => clearInterval(interval);
   }, []);
 

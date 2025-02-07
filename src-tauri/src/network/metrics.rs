@@ -150,6 +150,13 @@ impl HostMetrics {
         self.packet_type_counts.values().sum()
     }
 
+    pub fn number_of_fragments_sent(&self) -> u64 {
+        *self
+            .packet_type_counts
+            .get(&PacketTypeLabel::MsgFragment)
+            .unwrap_or(&0)
+    }
+
     pub fn number_of_messages_sent(&self) -> u64 {
         self.latencies.len() as u64
     }

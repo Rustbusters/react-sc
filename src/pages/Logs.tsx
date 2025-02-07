@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowDownToLine } from "lucide-react";
 import { toast } from "sonner";
+import { useSimulation } from "@/components/SimulationContext.tsx";
 
 interface Message {
   id: number;
@@ -24,6 +25,7 @@ export const Logs = () => {
   const [maxMessages, setMaxMessages] = useState<number>(parseInt(localStorage.getItem("maxMessages") || "1000", 10));
   const [isAtBottom, setIsAtBottom] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const { pollingInterval } = useSimulation()
 
   const logsContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -61,7 +63,7 @@ export const Logs = () => {
 
   useEffect(() => {
     fetchAndDisplayMessages();
-    const interval = setInterval(fetchAndDisplayMessages, 5000);
+    const interval = setInterval(fetchAndDisplayMessages, pollingInterval);
     return () => clearInterval(interval);
   }, [lastMessageId]);
 

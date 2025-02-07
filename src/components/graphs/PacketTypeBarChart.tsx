@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart.tsx";
 import { Bar, BarChart, CartesianGrid, LabelList, XAxis } from "recharts";
+import { cn } from "@/lib/utils.ts";
 
 const chartConfig = {
   MsgFragment: {
@@ -27,9 +28,10 @@ const chartConfig = {
 
 interface PacketTypeBarChartProps {
   packetData: Record<string, number>;
+  className?: string;
 }
 
-const PacketTypeBarChart: React.FC<PacketTypeBarChartProps> = ({ packetData }) => {
+const PacketTypeBarChart: React.FC<PacketTypeBarChartProps> = ({ packetData, className }) => {
   if (!packetData || Object.keys(packetData).length === 0) {
     return <p className="text-center">No packet data available</p>;
   }
@@ -45,7 +47,7 @@ const PacketTypeBarChart: React.FC<PacketTypeBarChartProps> = ({ packetData }) =
     .sort((a, b) => a.type.localeCompare(b.type));
 
   return (
-    <Card className="md:col-span-2 p-2">
+    <Card className={ cn("p-2", className) }>
       <CardHeader>
         <CardTitle className="font-semibold">Breakdown by Type</CardTitle>
       </CardHeader>
