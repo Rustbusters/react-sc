@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "
 import { Progress } from "@/components/ui/progress";
 import { useSimulation } from "@/components/SimulationContext.tsx";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert.tsx";
-import { Terminal, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 
 // ─── ZOD SCHEMA ────────────────────────────────────────────────────────────────
 
@@ -117,7 +117,7 @@ export default function SendPacketForm() {
       // Set sending state so that the progress bar and Stop button appear.
       setIsSending(true);
       // Invoke the backend command
-      invoke("start_repeated_sending", {
+      await invoke("start_repeated_sending", {
         senderId: Number(data.senderId),
         sessionId: Number(data.sessionId),
         packetType: data.packetType,

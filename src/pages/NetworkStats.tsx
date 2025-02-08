@@ -31,7 +31,7 @@ const NetworkStatsPage = () => {
       }
     };
 
-    fetchNodes();
+    fetchNodes().then(r => r);
   }, []);
 
   useEffect(() => {

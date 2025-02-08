@@ -267,7 +267,7 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
         selectedEdges.unselect();
       }
 
-      loadGraphData();
+      await loadGraphData();
     };
 
     document.addEventListener("keydown", handleKeyDown);
@@ -358,7 +358,7 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
 
       toast.success(`Drone ${ newDroneId } added successfully!`);
       setIsDialogOpen(false);
-      loadGraphData();
+      await loadGraphData();
     } catch (error) {
       console.error("Error while adding the drone:", error);
       toast.error("Error while adding the drone.");
@@ -390,7 +390,7 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
         <Button
           onClick={ () => {
             saveGraphLayout();
-            loadGraphData();
+            loadGraphData().then(r => r);
           } }
           className="p-2 aspect-square"
         >

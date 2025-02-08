@@ -73,7 +73,7 @@ export const SimulationProvider = ({ children }: { children: React.ReactNode }) 
       }
     };
 
-    fetchStatus();
+    fetchStatus().then(r => r);
   }, []);
 
   useEffect(() => {

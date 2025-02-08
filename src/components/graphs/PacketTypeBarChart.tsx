@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.t
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart.tsx";
 import { Bar, BarChart, CartesianGrid, LabelList, XAxis } from "recharts";
 import { cn } from "@/lib/utils.ts";
+import React from "react";
 
 const chartConfig = {
   MsgFragment: {

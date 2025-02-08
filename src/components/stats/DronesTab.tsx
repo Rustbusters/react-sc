@@ -53,7 +53,7 @@ const DronesTab = ({ selectedDroneId }: { selectedDroneId: NetworkNode | null })
       }
     };
 
-    fetchMetrics();
+    fetchMetrics().then(r => r);
     const interval = setInterval(fetchMetrics, pollingInterval);
     return () => clearInterval(interval);
   }, [selectedDroneId]);
@@ -70,7 +70,6 @@ const DronesTab = ({ selectedDroneId }: { selectedDroneId: NetworkNode | null })
     return <p className="text-center">Data not available</p>;
   }
 
-  const fragmentsSent = metrics.packet_type_counts.MsgFragment || 0;
   const latestMetrics = metrics.time_series.length > 0 ? metrics.time_series[metrics.time_series.length - 1] : {
     sent: 0,
     dropped: 0

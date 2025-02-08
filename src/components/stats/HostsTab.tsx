@@ -62,7 +62,7 @@ const HostsTab = ({ selectedHostId }: { selectedHostId: NetworkNode | null }) =>
       }
     };
 
-    fetchMetrics();
+    fetchMetrics().then(r => r);
     const interval = setInterval(fetchMetrics, pollingInterval);
     return () => clearInterval(interval);
   }, [selectedHostId]);

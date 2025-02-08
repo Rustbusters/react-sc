@@ -55,9 +55,9 @@ const Home = () => {
             <p>The simulation status is always visible in the top-right corner.</p>
             <Button className="mt-4 w-full" variant="outline" onClick={ () => {
               if (status === "Running") {
-                stopNetwork();
+                stopNetwork().then(r => r);
               } else {
-                startNetwork();
+                startNetwork().then(r => r);
               }
             } }>
               <span

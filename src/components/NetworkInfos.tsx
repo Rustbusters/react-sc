@@ -36,7 +36,7 @@ const NetworkInfos = () => {
   };
 
   useEffect(() => {
-    fetchNetworkInfos();
+    fetchNetworkInfos().then(r => r);
     const interval = setInterval(fetchNetworkInfos, pollingInterval);
     return () => clearInterval(interval);
   }, []);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,7 +62,7 @@ export const Logs = () => {
   };
 
   useEffect(() => {
-    fetchAndDisplayMessages();
+    fetchAndDisplayMessages().then(r => r);
     const interval = setInterval(fetchAndDisplayMessages, pollingInterval);
     return () => clearInterval(interval);
   }, [lastMessageId]);

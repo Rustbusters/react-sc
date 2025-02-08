@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import cytoscape from "cytoscape";
 
 interface GraphState {
   elements: cytoscape.ElementDefinition[]; // Gli elementi del grafo (nodi e archi)

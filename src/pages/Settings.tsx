@@ -107,13 +107,13 @@ const Settings = () => {
   };
 
   useEffect(() => {
-    loadConfigs();
-    loadLastConfig();
+    loadConfigs().then(r => r);
+    loadLastConfig().then(r => r);
   }, []);
 
   useEffect(() => {
     if (status === "Running") {
-      loadConfigs();
+      loadConfigs().then(r => r);
     }
   }, [status]);
 
@@ -177,7 +177,7 @@ const Settings = () => {
       }
     };
 
-    fetchSettings();
+    fetchSettings().then(r => r);
   }, []);
 
 

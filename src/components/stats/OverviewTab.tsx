@@ -47,8 +47,8 @@ const OverviewTab = () => {
   };
 
   useEffect(() => {
-    fetchMetrics();
-    fetchNodeTypes();
+    fetchMetrics().then(r => r);
+    fetchNodeTypes().then(r => r);
 
     const interval = setInterval(fetchMetrics, pollingInterval);
     return () => clearInterval(interval);
@@ -59,8 +59,8 @@ const OverviewTab = () => {
       if ((event.metaKey || event.ctrlKey) && event.key === "r") {
         event.preventDefault(); // Prevent browser refresh
         console.log("Refreshing data...");
-        fetchMetrics();
-        fetchNodeTypes
+        fetchMetrics().then(r => r);
+        fetchNodeTypes().then(r => r)
       }
     };
 

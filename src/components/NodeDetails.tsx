@@ -63,7 +63,7 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
   }, [nodeId]);
 
   useEffect(() => {
-    fetchNodeDetails();
+    fetchNodeDetails().then(r => r);
     const interval = setInterval(fetchNodeDetails, pollingInterval);
     return () => clearInterval(interval);
   }, [fetchNodeDetails]);
