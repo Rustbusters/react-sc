@@ -8,7 +8,7 @@ use serde_json::Value;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
-use wg_2024::config::{Config, Drone};
+use wg_2024::config::Drone;
 use wg_2024::network::{NodeId, SourceRoutingHeader};
 use wg_2024::packet::{FloodRequest, FloodResponse, Fragment, Nack, NackType, NodeType, Packet};
 
@@ -28,7 +28,7 @@ pub fn send_set_pdr_command(
     state: State<Arc<Mutex<NetworkState>>>,
     drone_id: u32,
     pdr: u8,
-) -> Result<(), String> {
+) -> Result<(), NetworkError> {
     state.lock().send_set_pdr_command(drone_id as NodeId, pdr)
 }
 
@@ -61,9 +61,9 @@ pub fn add_drone(
     let mut state = state.lock();
 
     if state.get_status() != NetworkStatus::Running {
-        match state.initial_config.as_mut() {
+        return match state.initial_config.as_mut() {
             None => {
-                return Err(NetworkError::NoConfigLoaded);
+                Err(NetworkError::NoConfigLoaded)
             }
             Some(config) => {
                 let how_many_nodes = config.drone.len() + config.client.len() + config.server.len();
@@ -76,7 +76,7 @@ pub fn add_drone(
                     drone_id += 1;
                 }
 
-                let mut drone = Drone {
+                let drone = Drone {
                     id: drone_id,
                     connected_node_ids: connected_node_ids.clone(),
                     pdr,
@@ -104,7 +104,7 @@ pub fn add_drone(
 
                 config.drone.push(drone);
 
-                return Ok(drone_id);
+                Ok(drone_id)
             }
         }
     }
@@ -130,12 +130,12 @@ pub fn add_drone(
         new_graph
             .adjacency
             .entry(drone_id)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(neighbor_id);
         new_graph
             .adjacency
             .entry(neighbor_id)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(drone_id);
     }
 
@@ -214,7 +214,7 @@ pub fn send_packet(
                     fragment_index: fi,
                     nack_type: NackType::DestinationIsDrone,
                 },
-                _ | "Dropped" => Nack {
+                _ => Nack { // Dropped
                     fragment_index: fi,
                     nack_type: NackType::Dropped,
                 },
@@ -246,7 +246,7 @@ pub fn send_packet(
 fn do_send_packet(
     state: &mut NetworkState,
     sender_id: NodeId,
-    session_id: u64,
+    _session_id: u64,
     packet: Packet,
     hops: Vec<NodeId>,
     hop_index: usize,
@@ -274,7 +274,7 @@ fn do_send_packet(
         hops.insert(0, sender_id);
         hop_index += 1;
     }
-    let routing_header = SourceRoutingHeader::new(hops.clone(), hop_index);
+    // let routing_header = SourceRoutingHeader::new(hops.clone(), hop_index);
     // (Assume that packet’s routing_header is set appropriately.)
     let next_node = hops.get(hop_index).copied().ok_or_else(|| {
         NetworkError::ValidationError(format!(

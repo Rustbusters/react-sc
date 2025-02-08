@@ -61,8 +61,7 @@ fn validate_bidirectionality(graph: &GraphState) -> Result<(), NetworkError> {
         for &neighbor in neighbors {
             if !graph
                 .adjacency
-                .get(&neighbor)
-                .map_or(false, |n| n.contains(node))
+                .get(&neighbor).is_some_and(|n| n.contains(node))
             {
                 return Err(NetworkError::ValidationError(format!(
                     "The graph is not bidirectional: {} -> {} exists, but not vice versa.",

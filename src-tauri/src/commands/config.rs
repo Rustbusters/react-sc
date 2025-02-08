@@ -2,7 +2,6 @@ use crate::error::NetworkError;
 use crate::network::state::NetworkState;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -30,49 +29,11 @@ pub fn load_config(
     Ok(())
 }
 
-/// Returns the configuration **as originally loaded**, in JSON form.
-/// This does *not* reflect runtime changes like added/removed links.
-#[tauri::command]
-pub fn get_config(state: State<Arc<Mutex<NetworkState>>>) -> serde_json::Value {
-    let state = state.lock();
-
-    if let Some(config) = &state.initial_config {
-        json!({
-            "drones": config.drone.iter().map(|d| {
-                json!({
-                    "id": d.id,
-                    "connected_node_ids": d.connected_node_ids,
-                    "pdr": d.pdr,
-                })
-            }).collect::<Vec<_>>(),
-            "clients": config.client.iter().map(|c| {
-                json!({
-                    "id": c.id,
-                    "connected_drone_ids": c.connected_drone_ids,
-                })
-            }).collect::<Vec<_>>(),
-            "servers": config.server.iter().map(|s| {
-                json!({
-                    "id": s.id,
-                    "connected_drone_ids": s.connected_drone_ids,
-                })
-            }).collect::<Vec<_>>(),
-        })
-    } else {
-        // If no initial_config is loaded, return an empty structure
-        json!({
-            "drones": [],
-            "clients": [],
-            "servers": [],
-        })
-    }
-}
-#[tauri::command]
-pub fn get_default_configs_dir(app_handle: AppHandle) -> Result<PathBuf, String> {
+pub fn get_default_configs_dir(app_handle: AppHandle) -> Result<PathBuf, NetworkError> {
     app_handle
         .path()
         .resolve("resources/default_configs", BaseDirectory::Resource)
-        .map_err(|e| format!("Errore directory default configs: {}", e))
+        .map_err(|e| NetworkError::PathError(e.to_string()))
 }
 
 #[tauri::command]
@@ -124,7 +85,7 @@ pub fn get_history_configs(app_handle: tauri::AppHandle) -> Result<Vec<ConfigFil
 
 #[tauri::command]
 pub fn get_default_configs(app_handle: tauri::AppHandle) -> Result<Vec<ConfigFile>, String> {
-    let dir = get_default_configs_dir(app_handle)?;
+    let dir = get_default_configs_dir(app_handle).map_err(|e| e.to_string())?;
     let mut configs = Vec::new();
 
     for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {

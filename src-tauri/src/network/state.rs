@@ -216,7 +216,7 @@ impl NetworkState {
 
         debug!("Graph validated successfully");
 
-        // Create inter-node channels for drones, clients, and servers
+        // Create internode channels for drones, clients, and servers
         for drone in &local_config.drone {
             let (sender, receiver) = crossbeam_channel::unbounded();
             self.inter_node_channels
@@ -374,17 +374,23 @@ impl NetworkState {
     }
 
     /// Dynamically sets the PDR on a given drone. Does NOT modify the static config.
-    pub fn send_set_pdr_command(&mut self, drone_id: NodeId, pdr: u8) -> Result<(), String> {
+    pub fn send_set_pdr_command(&mut self, drone_id: NodeId, pdr: u8) -> Result<(), NetworkError> {
         if pdr > 100 {
             error!("PDR out of range (0..100)");
-            return Err(format!("PDR must be between 0 and 100, got: {}", pdr));
+            // use InvalidPdr
+            return Err(NetworkError::InvalidPdr(pdr));
         }
 
         // Notify the drone to change PDR, if present
         if let Some((cmd_sender, _)) = self.drones_controller_channels.get(&drone_id) {
             cmd_sender
                 .send(DroneCommand::SetPacketDropRate((pdr as f32) / 100.0))
-                .map_err(|_| "Failed to send SetPacketDropRate command")?;
+                .map_err(|_| {
+                    NetworkError::CommandSendError(format!(
+                        "Failed to send SetPDR command to drone {}",
+                        drone_id
+                    ))
+                })?;
         }
 
         // Update runtime metadata

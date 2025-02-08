@@ -6,7 +6,6 @@ use parking_lot::Mutex;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use tauri::AppHandle;
 use wg_2024::controller::DroneEvent;
 use wg_2024::network::NodeId;
 use wg_2024::packet::{Packet, PacketType};

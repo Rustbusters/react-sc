@@ -1,5 +1,5 @@
 use crate::error::NetworkError;
-use crate::network::state::{NetworkState, NodeMetadata};
+use crate::network::state::NetworkState;
 use ap2024_unitn_cppenjoyers_drone::CppEnjoyersDrone;
 use client::RustbustersClient;
 use common_utils::{HostCommand, HostEvent};
@@ -255,7 +255,7 @@ pub fn initialize_clients(state: &mut NetworkState) -> Result<(), NetworkError> 
         }
 
         let client_clone = client.clone();
-        let discovery_interval = state.discovery_interval.clone();
+        let discovery_interval = state.discovery_interval;
         let handle = thread::spawn(move || {
             let mut client_host = RustbustersClient::new(
                 client_clone.id,
@@ -340,7 +340,7 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
 
         let server_clone = server.clone();
 
-        let discovery_interval = state.discovery_interval.clone();
+        let discovery_interval = state.discovery_interval;
         let server_istance = RustBustersServer::new(
             server_clone.id,
             evt_tx,

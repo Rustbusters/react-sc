@@ -1,5 +1,5 @@
 use crate::error::NetworkError;
-use crate::network::state::{NetworkState, NetworkStatus, NodeMetadata, NodeType};
+use crate::network::state::{NetworkState, NetworkStatus, NodeType};
 use common_utils::HostCommand;
 use log::{error, info};
 use parking_lot::Mutex;
@@ -142,7 +142,6 @@ pub fn stop_network(
 
 // =============================================================================
 use serde_json::{json, Value};
-use wg_2024::network::NodeId;
 
 #[tauri::command]
 pub fn get_network_nodes(

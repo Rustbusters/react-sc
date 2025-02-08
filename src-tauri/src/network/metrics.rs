@@ -141,7 +141,7 @@ pub struct HostMetrics {
     pub shortcuts: u64,
     /// Count for each packet type sent by the host
     pub packet_type_counts: HashMap<PacketTypeLabel, u64>,
-    /// Latency for each message sent by the host. It could be use to compute number of Message sent
+    /// Latency for each message sent by the host. It could be used to compute number of Message sent
     pub latencies: Vec<Duration>,
     /// Time series for the number of packets sent and dropped
     pub time_series: Vec<HostMetricsTimePoint>,

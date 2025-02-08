@@ -1,5 +1,4 @@
 use serde::ser::{Serialize, Serializer};
-use std::path::PathBuf;
 use thiserror::Error;
 use wg_2024::network::NodeId;
 
@@ -20,17 +19,8 @@ pub enum NetworkError {
     #[error("No configuration loaded")]
     NoConfigLoaded,
 
-    #[error("Invalid configuration path: {0}")]
-    InvalidConfigPath(PathBuf),
-
     #[error("The selected node does not exist: {0}")]
     NodeNotFound(String),
-
-    #[error("The target drone does not exist")]
-    TargetDroneNotFound,
-
-    #[error("The source and target drone cannot be the same")]
-    SameDroneTarget,
 
     #[error("Invalid Packet Drop Rate value: {0}")]
     InvalidPdr(u8),
@@ -52,6 +42,9 @@ pub enum NetworkError {
 
     #[error("Generic error: {0}")]
     Other(String),
+
+    #[error("Path error: {0}")]
+    PathError(String),
 }
 
 impl Serialize for NetworkError {

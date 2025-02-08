@@ -6,10 +6,10 @@ mod utils;
 
 use crate::commands::{
     add_drone, add_neighbor, config_remove_edge, config_remove_node, crash_command,
-    delete_history_config, get_all_drones_statistics, get_config, get_default_configs,
-    get_default_configs_dir, get_discovery_interval, get_drone_metrics, get_drone_statistics,
-    get_global_statistics, get_graph, get_history_configs, get_history_dir, get_host_metrics,
-    get_host_stats, get_network_infos, get_network_nodes, get_network_status, get_new_messages,
+    delete_history_config, get_default_configs,
+    get_discovery_interval, get_drone_metrics,
+    get_graph, get_history_configs, get_history_dir, get_host_metrics,
+    get_network_infos, get_network_nodes, get_network_status, get_new_messages,
     get_node_info, get_overview_metrics, get_strict_mode, load_config, remove_neighbor,
     send_packet, send_set_pdr_command, set_discovery_interval, set_strict_mode, start_network,
     start_repeated_sending, stop_network, stop_repeated_sending,
@@ -52,8 +52,7 @@ pub fn run() {
                         log::error!("Failed to load config: {:?}", err);
                     }
                 }
-
-                let app_handle = app.handle().clone();
+                
                 let listener = Listener::new(state);
                 listener.start();
 
@@ -64,11 +63,9 @@ pub fn run() {
         .manage(Arc::new(Mutex::new(None::<Arc<AtomicBool>>)))
         .invoke_handler(tauri::generate_handler![
             // config commands
-            load_config,
-            get_config,
+            load_config, //
             get_history_configs,
             delete_history_config,
-            get_default_configs_dir,
             get_default_configs,
             get_history_dir,
             config_remove_edge,
@@ -93,13 +90,9 @@ pub fn run() {
             send_packet,
             add_drone,
             // stats
-            get_drone_statistics,
-            get_all_drones_statistics,
-            get_global_statistics,
             get_new_messages,
             get_network_infos,
             get_node_info,
-            get_host_stats,
             get_overview_metrics,
             get_drone_metrics,
             get_host_metrics,
