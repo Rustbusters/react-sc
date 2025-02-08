@@ -371,7 +371,7 @@ const Settings = () => {
 
 
         <div className="flex flex-row items-center justify-start gap-4">
-          <Label htmlFor="richColors">Toast Colorati</Label>
+          <Label htmlFor="richColors">Colorful Toast</Label>
           <Switch id="richColors" checked={ richColors } onCheckedChange={ setRichColors }/>
         </div>
       </div>

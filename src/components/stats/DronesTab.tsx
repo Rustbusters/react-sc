@@ -70,8 +70,7 @@ const DronesTab = ({ selectedDroneId }: { selectedDroneId: NetworkNode | null })
     return <p className="text-center">Data not available</p>;
   }
 
-  const totalPacketsSent = Object.values(metrics.packet_type_counts).reduce((sum, count) => sum + count, 0);
-  const receivedPacketPercentage = totalPacketsSent > 0 ? ((totalPacketsSent - metrics.drops) / totalPacketsSent) * 100 : 0;
+  const fragmentsSent = metrics.packet_type_counts.MsgFragment || 0;
   const latestMetrics = metrics.time_series.length > 0 ? metrics.time_series[metrics.time_series.length - 1] : {
     sent: 0,
     dropped: 0

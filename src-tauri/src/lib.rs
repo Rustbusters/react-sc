@@ -39,7 +39,7 @@ pub fn run() {
                 if cfg!(debug_assertions) {
                     app.handle().plugin(
                         tauri_plugin_log::Builder::default()
-                            .level(log::LevelFilter::Info)
+                            .level(log::LevelFilter::Error)
                             // .filter(|metadata| metadata.target().starts_with("reactsc"))
                             .build(),
                     )?;

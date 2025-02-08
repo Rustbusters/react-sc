@@ -18,38 +18,54 @@ const OverviewTab = () => {
   const [loading, setLoading] = useState(true);
   const { pollingInterval } = useSimulation();
 
+
+  const fetchMetrics = async () => {
+    try {
+      const response: OverviewMetrics = await invoke("get_overview_metrics");
+      setData(response);
+      console.log(response.heatmap);
+    } catch (error) {
+      console.error("Error fetching metrics:", error);
+      toast.error("Error fetching metrics.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchNodeTypes = async () => {
+    try {
+      const response: NetworkNode[] = await invoke("get_network_nodes");
+      const typesMap: Record<string, "Drone" | "Client" | "Server"> = {};
+      response.forEach((node) => {
+        typesMap[node.id] = node.type;
+      });
+      setNodeTypes(typesMap);
+    } catch (error) {
+      console.error("Error fetching network nodes:", error);
+      toast.error("Error fetching network nodes.");
+    }
+  };
+
   useEffect(() => {
-    const fetchMetrics = async () => {
-      try {
-        const response: OverviewMetrics = await invoke("get_overview_metrics");
-        setData(response);
-      } catch (error) {
-        console.error("Error fetching metrics:", error);
-        toast.error("Error fetching metrics.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const fetchNodeTypes = async () => {
-      try {
-        const response: NetworkNode[] = await invoke("get_network_nodes");
-        const typesMap: Record<string, "Drone" | "Client" | "Server"> = {};
-        response.forEach((node) => {
-          typesMap[node.id] = node.type;
-        });
-        setNodeTypes(typesMap);
-      } catch (error) {
-        console.error("Error fetching network nodes:", error);
-        toast.error("Error fetching network nodes.");
-      }
-    };
-
     fetchMetrics();
     fetchNodeTypes();
 
     const interval = setInterval(fetchMetrics, pollingInterval);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "r") {
+        event.preventDefault(); // Prevent browser refresh
+        console.log("Refreshing data...");
+        fetchMetrics();
+        fetchNodeTypes
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   if (loading) {

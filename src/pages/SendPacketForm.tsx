@@ -12,6 +12,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { useSimulation } from "@/components/SimulationContext.tsx";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert.tsx";
+import { Terminal, TriangleAlert } from "lucide-react";
 
 // ─── ZOD SCHEMA ────────────────────────────────────────────────────────────────
 
@@ -464,6 +466,17 @@ export default function SendPacketForm() {
           <Progress value={ percent } max={ 100 }/>
         </div>
       ) }
+
+      <Alert className="mt-10">
+        <TriangleAlert className="h-4 w-4"/>
+        <AlertTitle>Warning!</AlertTitle>
+        <AlertDescription>
+          You might send a packet to nodes that are not expecting it, potentially causing unintended behavior and making
+          the program panic.
+          Proceed with caution.
+        </AlertDescription>
+      </Alert>
+
     </div>
   );
 }

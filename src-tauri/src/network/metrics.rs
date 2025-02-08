@@ -1,10 +1,13 @@
 use crate::network::state::NodeType;
 use common_utils::PacketTypeHeader;
+use log::error;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use wg_2024::network::NodeId;
 use wg_2024::packet::{Packet, PacketType};
+
+const ROLLING_WINDOW_SIZE: usize = 100;
 
 // =============================================================================
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Eq, Hash)]
@@ -55,6 +58,8 @@ pub struct DroneMetrics {
 
     pub current_pdr: f32,
 
+    pub rolling_window: Vec<bool>,
+
     /// Number of shortcuts used by the drone
     pub shortcuts: u64,
 
@@ -77,15 +82,28 @@ impl DroneMetrics {
     }
 
     pub fn update_pdr(&mut self, successful: bool) {
-        self.current_pdr = self.current_pdr * 0.99 + if successful { 0.00 } else { 0.1 };
+        // Add success/failure to rolling window
+        self.rolling_window.push(successful);
+        if self.rolling_window.len() > ROLLING_WINDOW_SIZE {
+            self.rolling_window.remove(0);
+        }
+
+        // Compute PDR based on recent `ROLLING_WINDOW_SIZE` packets
+        let failed = self.rolling_window.iter().filter(|&&s| !s).count() as f32;
+        self.current_pdr = if self.rolling_window.is_empty() {
+            0.0
+        } else {
+            failed / self.rolling_window.len() as f32
+        };
 
         let sent = self.number_of_msg_fragments_sent();
         let dropped = self.drops;
-
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|d| d.as_secs())
             .unwrap_or_default();
+
+        // Maintain rolling window for time series
         self.time_series.push(MetricsTimePoint {
             timestamp,
             sent,
@@ -109,6 +127,13 @@ impl DroneMetrics {
 // 5. Statistiche per gli host (client/server)
 // =============================================================================
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HostMetricsTimePoint {
+    pub timestamp: u64,
+    pub sent: u64,
+    pub acked: u64,
+}
+
 #[derive(Debug, Default)]
 pub struct HostMetrics {
     /// For each destination: (sent, acked)
@@ -120,7 +145,7 @@ pub struct HostMetrics {
     /// Latency for each message sent by the host. It could be use to compute number of Message sent
     pub latencies: Vec<Duration>,
     /// Time series for the number of packets sent and dropped
-    pub time_series: Vec<MetricsTimePoint>,
+    pub time_series: Vec<HostMetricsTimePoint>,
 }
 
 impl HostMetrics {
@@ -128,12 +153,32 @@ impl HostMetrics {
         let entry = self.dest_stats.entry(dest).or_insert((0, 0));
         entry.0 += 1;
         *self.packet_type_counts.entry(packet_type).or_insert(0) += 1;
+
+        if packet_type == PacketTypeLabel::MsgFragment {
+            self.update_time_series();
+        }
     }
 
     /// Record an ack received by the host from another host.
     pub fn record_ack(&mut self, src: NodeId) {
         let entry = self.dest_stats.entry(src).or_insert((0, 0));
         entry.1 += 1;
+
+        self.update_time_series();
+    }
+
+    fn update_time_series(&mut self) {
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or_default();
+        let sent = self.dest_stats.values().map(|(s, _)| s).sum();
+        let acked = self.dest_stats.values().map(|(_, a)| a).sum();
+        self.time_series.push(HostMetricsTimePoint {
+            timestamp,
+            sent,
+            acked,
+        });
     }
 
     /// Record a shortcut used by the host.
@@ -250,6 +295,12 @@ impl Metrics {
             if let Some(destination) = packet_header.routing_header.destination() {
                 let packet_type = PacketTypeLabel::from(&packet_header.pack_type);
                 host_metrics.record_packet(destination, packet_type);
+            }
+        }
+
+        if let Some(current_hop) = packet_header.routing_header.current_hop() {
+            if matches!(packet_header.pack_type, PacketTypeHeader::MsgFragment) {
+                self.update_global_heatmap(node_id, current_hop);
             }
         }
     }

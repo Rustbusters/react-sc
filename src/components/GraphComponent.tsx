@@ -15,7 +15,7 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
   const cyRef = useRef<HTMLDivElement>(null);
   const [cy, setCy] = useState<cytoscape.Core | null>(null);
   const { status } = useSimulation();
-  const [_zoomLevel, setZoomLevel] = useState(1);
+  const [zoomLevel, setZoomLevel] = useState(1);
 
 
   const saveGraphLayout = () => {
@@ -351,6 +351,14 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
     setRefreshGraph(() => loadGraphData);
   }, [loadGraphData, setRefreshGraph]);
 
+  /*const getCyclicGridSize = (zoom: number) => {
+    const baseSize = 20;
+    const maxScale = 35;
+
+    return baseSize * Math.pow(2, (Math.log2(zoom) % Math.log2(maxScale / baseSize)));
+  };*/
+
+
   return (
     <div className="relative flex flex-col h-full w-full min-w-0 overflow-hidden rounded-lg">
       <div
@@ -359,7 +367,7 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
         /*style={ {
           backgroundColor: "white",
           backgroundImage: "radial-gradient(circle, rgba(0, 0, 0, 0.3) 1px, transparent 1px)",
-          backgroundSize: `${ Math.min(100, Math.max(20, 10 * zoomLevel)) }px ${ Math.min(100, Math.max(20, 10 * zoomLevel)) }px`, // Scala con lo zoom
+          backgroundSize: `${ getCyclicGridSize(zoomLevel) }px ${ getCyclicGridSize(zoomLevel) }px`,
           backgroundPosition: "center",
         } }*/
       />

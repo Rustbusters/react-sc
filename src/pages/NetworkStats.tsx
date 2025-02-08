@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import OverviewTab from "@/components/stats/OverviewTab.tsx";
-import NetworkTab from "@/components/stats/NetworkTab.tsx";
 import DronesTab from "@/components/stats/DronesTab.tsx";
 import HostsTab from "@/components/stats/HostsTab.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
@@ -63,7 +62,7 @@ const NetworkStatsPage = () => {
         <div className="flex flex-row justify-between items-center">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="network">Network</TabsTrigger>
+            {/*<TabsTrigger value="network">Network</TabsTrigger>*/ }
             <TabsTrigger value="drones">Drones</TabsTrigger>
             <TabsTrigger value="hosts">Hosts</TabsTrigger>
           </TabsList>
@@ -89,9 +88,9 @@ const NetworkStatsPage = () => {
         <TabsContent value="overview">
           <OverviewTab/>
         </TabsContent>
-        <TabsContent value="network">
+        {/*<TabsContent value="network">
           <NetworkTab/>
-        </TabsContent>
+        </TabsContent>*/ }
         <TabsContent value="drones">
           <DronesTab selectedDroneId={ selectedNode }/>
         </TabsContent>

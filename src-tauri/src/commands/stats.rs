@@ -239,7 +239,7 @@ pub fn get_network_infos(state: State<Arc<Mutex<NetworkState>>>) -> Value {
 }
 
 use crate::error::NetworkError;
-use crate::network::metrics::{DroneMetrics, PacketTypeLabel};
+use crate::network::metrics::{DroneMetrics, HostMetricsTimePoint, PacketTypeLabel};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
@@ -297,7 +297,7 @@ pub fn get_node_info(
         NodeType::Client => "Client",
         NodeType::Server => "Server",
     };
-    
+
     let node_group = metadata.node_group.clone();
 
     let metrics = match metadata.node_type {
@@ -433,6 +433,7 @@ pub fn get_drone_metrics(
 pub struct HostStats {
     latencies: Vec<Duration>,
     number_of_fragment_sent: u64,
+    time_series: Vec<HostMetricsTimePoint>,
 }
 
 #[tauri::command]
@@ -455,8 +456,16 @@ pub fn get_host_metrics(
         .map(|m| m.number_of_fragments_sent())
         .ok_or_else(|| NetworkError::NodeNotFound(node_id.to_string()))?;
 
+    let time_series = state
+        .metrics
+        .host_metrics
+        .get(&node_id)
+        .map(|m| m.time_series.clone())
+        .ok_or_else(|| NetworkError::NodeNotFound(node_id.to_string()))?;
+
     Ok(HostStats {
         latencies,
         number_of_fragment_sent,
+        time_series,
     })
 }

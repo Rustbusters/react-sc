@@ -6,6 +6,7 @@ import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "
 import { CartesianGrid, Line, LineChart, XAxis } from "recharts";
 import { NetworkNode } from "@/pages/NetworkStats.tsx";
 import { useSimulation } from "@/components/SimulationContext.tsx";
+import { TrendingUp } from "lucide-react";
 
 interface LatencyData {
   secs: number;
@@ -15,12 +16,24 @@ interface LatencyData {
 interface HostMetrics {
   latencies: LatencyData[];
   number_of_fragment_sent: number;
+  time_series: Array<{ timestamp: number; sent: number; acked: number }>;
 }
 
-const chartConfig = {
+const chartLatencyConfig = {
   latency: {
     label: "Latency (ms)",
     color: "hsl(var(--chart-1))",
+  },
+} satisfies ChartConfig;
+
+const chartSentAckConfig = {
+  sent: {
+    label: "Sent Packets",
+    color: "hsl(var(--chart-1))",
+  },
+  acked: {
+    label: "Acknowledged Packets",
+    color: "hsl(var(--chart-2))",
   },
 } satisfies ChartConfig;
 
@@ -89,16 +102,66 @@ const HostsTab = ({ selectedHostId }: { selectedHostId: NetworkNode | null }) =>
     latency,
   }));
 
+  const lineChartData = metrics.time_series.map((point) => ({
+    time: new Date(point.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    sent: point.sent,
+    acked: point.acked,
+  }));
+
   return (
     <div className="flex gap-4 py-6">
       {/* Drop / MsgFragment Chart */ }
       <Card className="w-1/2 p-6">
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Drops / MsgFragments</CardTitle>
+          <CardTitle className="text-lg font-semibold">MsgFragment Sent vs Acknowledged</CardTitle>
         </CardHeader>
         <CardContent>
-          {/* To be implemented: MsgFragment sent vs dropped chart */ }
+          <ChartContainer config={ chartSentAckConfig }>
+            <LineChart
+              accessibilityLayer
+              data={ lineChartData }
+              margin={ { left: 12, right: 12 } }
+            >
+              <CartesianGrid vertical={ false }/>
+              <XAxis
+                dataKey="time"
+                tickLine={ false }
+                axisLine={ false }
+                tickMargin={ 8 }
+              />
+              <ChartTooltip cursor={ false } content={ <ChartTooltipContent/> }/>
+              <Line
+                dataKey="sent"
+                type="monotone"
+                stroke="hsl(var(--chart-1))"
+                strokeWidth={ 2 }
+                dot={ false }
+              />
+              <Line
+                dataKey="acked"
+                type="monotone"
+                stroke="hsl(var(--chart-2))"
+                strokeWidth={ 2 }
+                dot={ false }
+              />
+            </LineChart>
+          </ChartContainer>
         </CardContent>
+        <CardFooter>
+          <div className="flex w-full items-start gap-2 text-sm">
+            <div className="grid gap-2">
+              <div className="flex items-center gap-2 font-medium leading-none">
+                Sent: { metrics.time_series.length > 0 ? metrics.time_series[metrics.time_series.length - 1].sent.toString() : "0" }
+                |
+                Acknowledged: { metrics.time_series.length > 0 ? metrics.time_series[metrics.time_series.length - 1].acked.toString() : "0" }
+                <TrendingUp className="h-4 w-4"/>
+              </div>
+              <div className="text-muted-foreground">
+                Showing message trend over time
+              </div>
+            </div>
+          </div>
+        </CardFooter>
       </Card>
 
       <div className="w-1/2 flex flex-col gap-4">
@@ -113,7 +176,7 @@ const HostsTab = ({ selectedHostId }: { selectedHostId: NetworkNode | null }) =>
             <CardTitle className="text-lg font-semibold">Latency Over Time (ms)</CardTitle>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={ chartConfig }>
+            <ChartContainer config={ chartLatencyConfig }>
               <LineChart
                 accessibilityLayer
                 data={ latencyChartData }
