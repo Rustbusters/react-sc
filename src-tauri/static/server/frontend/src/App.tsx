@@ -24,12 +24,12 @@ const App: React.FC<AppProps> = () => {
 
   // Server messages
   let [serversMessages, setServersMessages] = useState<ServerMessages>(new Map());
-  serversMessages.set(0, [
-    { id: "1", srcId: "2", destId: "3", message: "Hello World", timestamp: 1707321600000 },
-    { id: "4", srcId: "1", destId: "3", message: "Hello World", timestamp: 1707321600000 },
-    { id: "2", srcId: "3", destId: "3", message: "Yo", timestamp: 1707321600002 },
-    { id: "3", srcId: "1", destId: "2", message: "My N", timestamp: 1707321600001 },
-  ]);
+  // serversMessages.set(0, [
+  //   { id: "1", srcId: "2", destId: "3", message: "Hello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello WorldHello World", timestamp: 1707321600000 },
+  //   { id: "4", srcId: "1", destId: "3", message: "Hello World", timestamp: 1707321600000 },
+  //   { id: "2", srcId: "3", destId: "3", message: "Yo", timestamp: 1707321600002 },
+  //   { id: "3", srcId: "1", destId: "2", message: "My N", timestamp: 1707321600001 },
+  // ]);
   // List of active users on each server
   let [serverActiveUsers, setActiveUsers] = useState<ServerActiveUsers>(new Map());
 
