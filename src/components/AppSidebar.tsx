@@ -15,7 +15,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useSimulation } from "@/components/SimulationContext.tsx";
 
 const items = [
-  { title: "Simulazione", url: "/simulation", icon: Play },
+  { title: "Simulation", url: "/simulation", icon: Play },
   { title: "Logs", url: "/logs", icon: Logs },
   { title: "Stats", url: "/stats", icon: ChartLine },
   { title: "Send", url: "/send", icon: Send },

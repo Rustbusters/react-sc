@@ -15,7 +15,7 @@ const Simulation = () => {
 
   return (
     <div className="flex flex-col w-full h-full select-none">
-      <div className="flex flex-1">
+      <div className="flex flex-1 overflow-y-scroll">
         <div className="w-1/2 h-full">
           <GraphComponent onNodeSelect={ setSelectedNode } setRefreshGraph={ setRefreshGraph }/>
         </div>

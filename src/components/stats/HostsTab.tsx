@@ -109,7 +109,7 @@ const HostsTab = ({ selectedHostId }: { selectedHostId: NetworkNode | null }) =>
   }));
 
   return (
-    <div className="flex gap-4 py-6">
+    <div className="flex gap-4 py-6 select-none">
       {/* Drop / MsgFragment Chart */ }
       <Card className="w-1/2 p-6">
         <CardHeader>

@@ -90,7 +90,7 @@ const OverviewTab = () => {
   const totalBytesTransferred = msgFragmentsSent * 128;
 
   return (
-    <div className="py-6 space-y-6">
+    <div className="py-6 space-y-6 select-none">
       {/* Main Statistics */ }
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <StatCard title="Packets Sent" value={ data.total_packets_sent.toLocaleString() }/>

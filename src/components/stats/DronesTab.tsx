@@ -84,7 +84,7 @@ const DronesTab = ({ selectedDroneId }: { selectedDroneId: NetworkNode | null })
   }));
 
   return (
-    <div className="py-6 flex gap-4">
+    <div className="py-6 flex gap-4 select-none">
       {/* Grid Layout */ }
       {/* Sent vs Dropped Packets Line Chart */ }
       <Card className="w-1/2 p-6">
@@ -143,7 +143,7 @@ const DronesTab = ({ selectedDroneId }: { selectedDroneId: NetworkNode | null })
         <div className="w-full space-y-4">
           {/* Two Side-by-Side Cards: PDR & Shortcuts */ }
           <div className="grid grid-cols-2 gap-4">
-            <StatCard title="Packet Delivery Ratio (PDR)" value={ metrics.current_pdr.toFixed(2) || "0" }/>
+            <StatCard title="Estimated PDR" value={ metrics.current_pdr.toFixed(2) || "0" }/>
             <StatCard title="Shortcuts Used" value={ metrics.shortcuts.toLocaleString() }/>
           </div>
         </div>
