@@ -1,10 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import cytoscape from "cytoscape";
 import { invoke } from "@tauri-apps/api/core";
-import { RefreshCcw } from "lucide-react";
+import { PlusCircle, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSimulation } from "@/components/SimulationContext.tsx";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Checkbox } from "@/components/ui/checkbox.tsx";
+import { getCssVariableAsRGB } from "@/lib/utils.ts";
 
 interface GraphComponentProps {
   onNodeSelect: (nodeId: string | null) => void;
@@ -15,7 +26,10 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
   const cyRef = useRef<HTMLDivElement>(null);
   const [cy, setCy] = useState<cytoscape.Core | null>(null);
   const { status } = useSimulation();
-  const [zoomLevel, setZoomLevel] = useState(1);
+  const [_zoomLevel, setZoomLevel] = useState(1);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [connectedNodes, setConnectedNodes] = useState<Record<string, boolean>>({});
+  const [pdr, setPdr] = useState<number>(0.10);
 
 
   const saveGraphLayout = () => {
@@ -138,28 +152,13 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
             "text-halign": "center",
             "text-valign": "center",
             "background-color": (ele) => {
-              const colors: Record<"server" | "drone" | "client", string> = {
-                server: "#FEFAF4",
-                drone: "#F5FAFA",
-                client: "#F9FBF6",
-              };
-
               const type = ele.data("type") as "server" | "drone" | "client";
-              return colors[type] || "#000";
+              return getCssVariableAsRGB(`--${ type }-background`);
             },
             "border-width": 2,
             "border-color": (ele) => {
-              const borderColors: Record<
-                "server" | "drone" | "client",
-                string
-              > = {
-                server: "#EDCB95",
-                drone: "#9ACDC8",
-                client: "#C3D59D",
-              };
-
               const type = ele.data("type") as "server" | "drone" | "client";
-              return borderColors[type] || "#333";
+              return getCssVariableAsRGB(`--${ type }-border`);
             },
             width: 20,
             height: 20,
@@ -182,17 +181,8 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
           style: {
             "border-width": 2.5,
             "border-color": (ele) => {
-              const borderColors: Record<
-                "server" | "drone" | "client",
-                string
-              > = {
-                server: "#E4B567",
-                drone: "#74BBB2",
-                client: "#A8C373",
-              };
-
               const type = ele.data("type") as "server" | "drone" | "client";
-              return borderColors[type] || "#333";
+              return getCssVariableAsRGB(`--${ type }-border-selected`);
             },
           },
         },
@@ -358,6 +348,23 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
     return baseSize * Math.pow(2, (Math.log2(zoom) % Math.log2(maxScale / baseSize)));
   };*/
 
+  const handleAddDrone = async () => {
+    try {
+      const selectedNodes = Object.keys(connectedNodes).filter((id) => connectedNodes[id]);
+      const newDroneId = await invoke<number>("add_drone", {
+        connectedNodeIds: selectedNodes.map(Number),
+        pdr: Number(pdr),
+      });
+
+      toast.success(`Drone ${ newDroneId } added successfully!`);
+      setIsDialogOpen(false);
+      loadGraphData();
+    } catch (error) {
+      console.error("Error while adding the drone:", error);
+      toast.error("Error while adding the drone.");
+    }
+  };
+
 
   return (
     <div className="relative flex flex-col h-full w-full min-w-0 overflow-hidden rounded-lg">
@@ -372,15 +379,73 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
         } }*/
       />
 
-      <Button
-        onClick={ () => {
-          saveGraphLayout();
-          loadGraphData();
-        } }
-        className="absolute bottom-4 right-4 z-10 p-2 aspect-square"
-      >
-        <RefreshCcw className="w-5 h-5"/>
-      </Button>
+      <div className="flex items-center gap-4 absolute bottom-4 right-4 z-10">
+        <Button
+          onClick={ () => setIsDialogOpen(true) }
+          className="p-2 aspect-square"
+        >
+          <PlusCircle className="w-5 h-5"/>
+        </Button>
+
+        <Button
+          onClick={ () => {
+            saveGraphLayout();
+            loadGraphData();
+          } }
+          className="p-2 aspect-square"
+        >
+          <RefreshCcw className="w-5 h-5"/>
+        </Button>
+      </div>
+
+      {/* Dialog to Add a Node */ }
+      <Dialog open={ isDialogOpen } onOpenChange={ setIsDialogOpen }>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add a New Drone</DialogTitle>
+            <DialogDescription>Configure the new drone before adding it to the network.</DialogDescription>
+          </DialogHeader>
+
+          {/* Input for PDR */ }
+          <div>
+            <label className="text-sm font-semibold">Packet Drop Rate (PDR)</label>
+            <Input
+              type="number"
+              step="0.1"
+              min="0"
+              max="1"
+              value={ pdr }
+              onChange={ (e) => setPdr(parseFloat(e.target.value)) }
+            />
+          </div>
+
+          {/* Selection of Connected Nodes */ }
+          <div>
+            <label className="text-sm font-semibold">Connected Nodes</label>
+            <div className="flex flex-wrap gap-2">
+              { cy &&
+                cy.nodes().map((node) => (
+                  <label key={ node.id() } className="flex items-center gap-2">
+                    <Checkbox
+                      checked={ connectedNodes[node.id()] || false }
+                      onCheckedChange={ (checked) =>
+                        setConnectedNodes((prev) => ({
+                          ...prev,
+                          [node.id()]: checked === true,
+                        }))
+                      }
+                    />
+                    { node.id() }
+                  </label>
+                )) }
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button onClick={ handleAddDrone }>Add</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

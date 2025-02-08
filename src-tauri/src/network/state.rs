@@ -129,50 +129,6 @@ impl NetworkState {
     // --------------------------------------------------------------------------
     // Convenience getters
     // --------------------------------------------------------------------------
-    /// Returns the list of node IDs that are considered drones in the current graph.
-    pub fn get_drones(&self) -> Vec<NodeId> {
-        self.graph
-            .node_info
-            .iter()
-            .filter_map(|(&node_id, meta)| {
-                if matches!(meta.node_type, NodeType::Drone) {
-                    Some(node_id)
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    /// Returns the list of node IDs that are considered clients in the current graph.
-    pub fn get_clients(&self) -> Vec<NodeId> {
-        self.graph
-            .node_info
-            .iter()
-            .filter_map(|(&node_id, meta)| {
-                if matches!(meta.node_type, NodeType::Client) {
-                    Some(node_id)
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    /// Returns the list of node IDs that are considered servers in the current graph.
-    pub fn get_servers(&self) -> Vec<NodeId> {
-        self.graph
-            .node_info
-            .iter()
-            .filter_map(|(&node_id, meta)| {
-                if matches!(meta.node_type, NodeType::Server) {
-                    Some(node_id)
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
 
     /// Returns the node type for a given node ID, if available.
     pub fn get_node_type(&self, node_id: NodeId) -> Option<NodeType> {

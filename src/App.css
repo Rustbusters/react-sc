@@ -37,6 +37,23 @@
         --sidebar-accent-foreground: 240 5.9% 10%;
         --sidebar-border: 220 13% 91%;
         --sidebar-ring: 217.2 91.2% 59.8%;
+
+        /* Drone Colors (Light Mode) */
+        --drone-background: 180 50% 95%; /* #F5FAFA */
+        --drone-border: 170 45% 60%; /* #9ACDC8 */
+
+        /* Server Colors (Light Mode) */
+        --server-background: 30 95% 95%; /* #FEFAF4 */
+        --server-border: 35 75% 60%; /* #EDCB95 */
+
+        /* Client Colors (Light Mode) */
+        --client-background: 90 80% 95%; /* #F9FBF6 */
+        --client-border: 100 40% 65%; /* #C3D59D */
+
+        /* Selection Colors */
+        --drone-border-selected: 170 50% 50%; /* #74BBB2 */
+        --server-border-selected: 35 85% 55%; /* #E4B567 */
+        --client-border-selected: 100 50% 50%; /* #A8C373 */
     }
 
     .dark {
@@ -72,6 +89,23 @@
         --sidebar-accent-foreground: 240 4.8% 95.9%;
         --sidebar-border: 240 3.7% 15.9%;
         --sidebar-ring: 217.2 91.2% 59.8%;
+
+        --drone-background: 180 50% 95%; /* #F5FAFA */
+        --drone-border: 170 45% 60%; /* #9ACDC8 */
+
+        /* Server Colors (Light Mode) */
+        --server-background: 30 95% 95%; /* #FEFAF4 */
+        --server-border: 35 75% 60%; /* #EDCB95 */
+
+        /* Client Colors (Light Mode) */
+        --client-background: 90 80% 95%; /* #F9FBF6 */
+        --client-border: 100 40% 65%; /* #C3D59D */
+
+        /* Selection Colors */
+        --drone-border-selected: 170 50% 50%; /* #74BBB2 */
+        --server-border-selected: 35 85% 55%; /* #E4B567 */
+        --client-border-selected: 100 50% 50%; /* #A8C373 */
+
     }
 }
 

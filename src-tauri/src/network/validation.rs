@@ -13,7 +13,7 @@ use std::collections::HashSet;
 /// # Returns
 /// - `Ok(())` if the graph is valid.
 /// - `Err(NetworkError::ValidationError)` if the graph is invalid.
-pub fn validate_graph(graph: &GraphState, strict: bool) -> Result<(), NetworkError> {
+pub(crate) fn validate_graph(graph: &GraphState, strict: bool) -> Result<(), NetworkError> {
     validate_connected_graph(graph)?;
     validate_bidirectionality(graph)?;
     validate_no_multiple_connections(graph)?;

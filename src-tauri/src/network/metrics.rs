@@ -1,6 +1,5 @@
 use crate::network::state::NodeType;
 use common_utils::PacketTypeHeader;
-use log::error;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -222,14 +221,6 @@ pub struct Metrics {
 }
 
 impl Metrics {
-    pub fn new() -> Self {
-        Self {
-            global_heatmap: HashMap::new(),
-            drone_metrics: HashMap::new(),
-            host_metrics: HashMap::new(),
-        }
-    }
-
     pub fn insert_node(&mut self, node_id: NodeId, node_type: NodeType) {
         match node_type {
             NodeType::Drone => {

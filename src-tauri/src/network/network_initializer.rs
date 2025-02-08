@@ -1,5 +1,5 @@
 use crate::error::NetworkError;
-use crate::network::state::NetworkState;
+use crate::network::state::{NetworkState, NodeMetadata};
 use ap2024_unitn_cppenjoyers_drone::CppEnjoyersDrone;
 use client::RustbustersClient;
 use common_utils::{HostCommand, HostEvent};
@@ -10,7 +10,6 @@ use log::info;
 use rust_do_it::RustDoIt;
 use rust_roveri::RustRoveri;
 use rustastic_drone::RustasticDrone;
-use rustbusters_drone::RustBustersDrone;
 use rusteze_drone::RustezeDrone;
 use rusty_drones::RustyDrone;
 use server::utils::traits::Runnable;
@@ -403,4 +402,94 @@ fn config_server_controller() -> (
         sender,
         receiver,
     )
+}
+
+use rand::seq::SliceRandom;
+use rand::thread_rng;
+
+/// Creates a new drone with the given connected neighbors and PDR.
+pub fn create_new_drone(
+    state: &mut NetworkState,
+    drone_id: NodeId,
+    connected_node_ids: Vec<NodeId>,
+    pdr: f32,
+) -> Result<NodeId, NetworkError> {
+    let (cmd_tx, cmd_rx) = unbounded::<DroneCommand>();
+    let (evt_tx, evt_rx) = unbounded::<DroneEvent>();
+
+    state
+        .drones_controller_channels
+        .insert(drone_id, (cmd_tx.clone(), evt_rx));
+
+    let (packet_sender, packet_receiver) = unbounded();
+    state
+        .inter_node_channels
+        .insert(drone_id, (packet_sender.clone(), packet_receiver.clone()));
+
+    let mut packet_send = HashMap::new();
+    for &neighbor_id in &connected_node_ids {
+        let neighbor_sender = state
+            .inter_node_channels
+            .get(&neighbor_id)
+            .ok_or(NetworkError::ChannelNotFound(neighbor_id))?
+            .0
+            .clone();
+
+        packet_send.insert(neighbor_id, neighbor_sender);
+    }
+
+    let drone_factories: Vec<DroneFactory> = drone_factories![
+        RustyDrone,
+        LockheedRustin,
+        FungiDrone,
+        RustasticDrone,
+        RustezeDrone,
+        RustDoIt,
+        RustRoveri,
+        RustAndFurious,
+        CppEnjoyersDrone,
+        RustDrone,
+    ];
+
+    let mut rng = thread_rng();
+    let selected_factory =
+        drone_factories
+            .choose(&mut rng)
+            .ok_or(NetworkError::ValidationError(
+                "Nessuna factory disponibile".into(),
+            ))?;
+
+    let new_drone = selected_factory(
+        drone_id,
+        evt_tx.clone(),
+        cmd_rx.clone(),
+        packet_receiver,
+        packet_send,
+        pdr,
+    );
+
+    if let Some(node_metadata) = state.graph.node_info.get_mut(&drone_id) {
+        node_metadata.node_group = Some(new_drone.drone_type().to_string());
+    }
+
+    for &neighbor_id in &connected_node_ids {
+        let neighbor_type = state
+            .graph
+            .node_info
+            .get(&neighbor_id)
+            .ok_or(NetworkError::NodeNotFound(neighbor_id.to_string()))?
+            .node_type
+            .clone();
+
+        state.send_add_sender_command(neighbor_id, &neighbor_type, drone_id)?;
+    }
+    
+    let handle = std::thread::spawn(move || {
+        let mut d = new_drone;
+        d.run();
+    });
+    
+    state.node_threads.insert(drone_id, handle);
+
+    Ok(drone_id)
 }

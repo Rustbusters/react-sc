@@ -1,11 +1,14 @@
 use crate::error::NetworkError;
-use crate::network::state::NetworkState;
+use crate::network::network_initializer::create_new_drone;
+use crate::network::state::{NetworkState, NetworkStatus, NodeMetadata};
+use crate::network::validation::validate_graph;
 use parking_lot::Mutex;
 use serde_json::json;
 use serde_json::Value;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
+use wg_2024::config::{Config, Drone};
 use wg_2024::network::{NodeId, SourceRoutingHeader};
 use wg_2024::packet::{FloodRequest, FloodResponse, Fragment, Nack, NackType, NodeType, Packet};
 
@@ -47,6 +50,105 @@ pub fn remove_neighbor(
 ) -> Result<(), NetworkError> {
     let mut state = state.lock();
     state.remove_neighbor(node_id, neighbor_id)
+}
+
+#[tauri::command]
+pub fn add_drone(
+    state: State<Arc<Mutex<NetworkState>>>,
+    connected_node_ids: Vec<NodeId>,
+    pdr: f32,
+) -> Result<NodeId, NetworkError> {
+    let mut state = state.lock();
+
+    if state.get_status() != NetworkStatus::Running {
+        match state.initial_config.as_mut() {
+            None => {
+                return Err(NetworkError::NoConfigLoaded);
+            }
+            Some(config) => {
+                let how_many_nodes = config.drone.len() + config.client.len() + config.server.len();
+                let mut drone_id = how_many_nodes as NodeId;
+
+                while config.drone.iter().any(|d| d.id == drone_id)
+                    || config.client.iter().any(|c| c.id == drone_id)
+                    || config.server.iter().any(|s| s.id == drone_id)
+                {
+                    drone_id += 1;
+                }
+
+                let mut drone = Drone {
+                    id: drone_id,
+                    connected_node_ids: connected_node_ids.clone(),
+                    pdr,
+                };
+
+                for &neighbor_id in &connected_node_ids {
+                    if let Some(neighbor) = config.drone.iter_mut().find(|d| d.id == neighbor_id) {
+                        if !neighbor.connected_node_ids.contains(&drone_id) {
+                            neighbor.connected_node_ids.push(drone_id);
+                        }
+                    } else if let Some(neighbor) =
+                        config.client.iter_mut().find(|c| c.id == neighbor_id)
+                    {
+                        if !neighbor.connected_drone_ids.contains(&drone_id) {
+                            neighbor.connected_drone_ids.push(drone_id);
+                        }
+                    } else if let Some(neighbor) =
+                        config.server.iter_mut().find(|s| s.id == neighbor_id)
+                    {
+                        if !neighbor.connected_drone_ids.contains(&drone_id) {
+                            neighbor.connected_drone_ids.push(drone_id);
+                        }
+                    }
+                }
+
+                config.drone.push(drone);
+
+                return Ok(drone_id);
+            }
+        }
+    }
+
+    let mut drone_id = state.graph.node_info.len() as NodeId;
+    while state.inter_node_channels.contains_key(&drone_id) {
+        drone_id += 1;
+    }
+
+    let mut new_graph = state.graph.clone();
+
+    new_graph.node_info.insert(
+        drone_id,
+        NodeMetadata {
+            node_type: crate::network::state::NodeType::Drone,
+            node_group: None, // it will be set later
+            pdr,
+            crashed: false,
+        },
+    );
+
+    for &neighbor_id in &connected_node_ids {
+        new_graph
+            .adjacency
+            .entry(drone_id)
+            .or_insert_with(Vec::new)
+            .push(neighbor_id);
+        new_graph
+            .adjacency
+            .entry(neighbor_id)
+            .or_insert_with(Vec::new)
+            .push(drone_id);
+    }
+
+    validate_graph(&new_graph, state.get_strict_mode())?;
+
+    state.graph = new_graph;
+
+    state
+        .metrics
+        .drone_metrics
+        .insert(drone_id, Default::default());
+
+    create_new_drone(&mut state, drone_id, connected_node_ids, pdr)
 }
 
 #[tauri::command]

@@ -5,13 +5,13 @@ mod network;
 mod utils;
 
 use crate::commands::{
-    add_neighbor, config_remove_edge, config_remove_node, crash_command, delete_history_config,
-    get_all_drones_statistics, get_config, get_default_configs, get_default_configs_dir,
-    get_discovery_interval, get_drone_metrics, get_drone_statistics, get_global_statistics,
-    get_graph, get_history_configs, get_history_dir, get_host_metrics, get_host_stats,
-    get_network_infos, get_network_nodes, get_network_status, get_new_messages, get_node_info,
-    get_overview_metrics, get_strict_mode, load_config, remove_neighbor, send_packet,
-    send_set_pdr_command, set_discovery_interval, set_strict_mode, start_network,
+    add_drone, add_neighbor, config_remove_edge, config_remove_node, crash_command,
+    delete_history_config, get_all_drones_statistics, get_config, get_default_configs,
+    get_default_configs_dir, get_discovery_interval, get_drone_metrics, get_drone_statistics,
+    get_global_statistics, get_graph, get_history_configs, get_history_dir, get_host_metrics,
+    get_host_stats, get_network_infos, get_network_nodes, get_network_status, get_new_messages,
+    get_node_info, get_overview_metrics, get_strict_mode, load_config, remove_neighbor,
+    send_packet, send_set_pdr_command, set_discovery_interval, set_strict_mode, start_network,
     start_repeated_sending, stop_network, stop_repeated_sending,
 };
 use crate::listener::Listener;
@@ -39,7 +39,7 @@ pub fn run() {
                 if cfg!(debug_assertions) {
                     app.handle().plugin(
                         tauri_plugin_log::Builder::default()
-                            .level(log::LevelFilter::Error)
+                            .level(log::LevelFilter::Info)
                             // .filter(|metadata| metadata.target().starts_with("reactsc"))
                             .build(),
                     )?;
@@ -54,7 +54,7 @@ pub fn run() {
                 }
 
                 let app_handle = app.handle().clone();
-                let listener = Listener::new(state, app_handle);
+                let listener = Listener::new(state);
                 listener.start();
 
                 Ok(())
@@ -91,6 +91,7 @@ pub fn run() {
             start_repeated_sending,
             stop_repeated_sending,
             send_packet,
+            add_drone,
             // stats
             get_drone_statistics,
             get_all_drones_statistics,

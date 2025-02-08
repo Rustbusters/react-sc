@@ -114,8 +114,14 @@ pub fn stop_network(
 
     for (node_id, handle) in net_state.node_threads.drain() {
         info!("Attempting to join thread for node {}", node_id);
-        handle.join().unwrap();
-        info!("Thread for node {} stopped successfully", node_id);
+        match handle.join() {
+            Ok(_) => {
+                info!("Thread for node {} joined successfully", node_id);
+            }
+            Err(_) => {
+                error!("Failed to join thread for node {}", node_id);
+            }
+        }
     }
 
     net_state.clear_simulation();

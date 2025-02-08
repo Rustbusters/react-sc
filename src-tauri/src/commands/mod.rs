@@ -11,7 +11,7 @@ pub use config::{
 pub use network::{get_network_nodes, get_network_status, start_network, stop_network};
 pub use simulation::{
     add_neighbor, crash_command, get_graph, remove_neighbor, send_packet, send_set_pdr_command,
-    start_repeated_sending, stop_repeated_sending,
+    start_repeated_sending, stop_repeated_sending, add_drone
 };
 pub use stats::{
     get_all_drones_statistics, get_drone_statistics, get_global_statistics, get_host_stats,

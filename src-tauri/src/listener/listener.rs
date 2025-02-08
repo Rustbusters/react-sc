@@ -13,12 +13,11 @@ use wg_2024::packet::{Packet, PacketType};
 
 pub struct Listener {
     state: Arc<Mutex<NetworkState>>,
-    app: AppHandle,
 }
 
 impl Listener {
-    pub fn new(state: Arc<Mutex<NetworkState>>, app: AppHandle) -> Self {
-        Self { state, app }
+    pub fn new(state: Arc<Mutex<NetworkState>>) -> Self {
+        Self { state }
     }
 
     /// Starts the listener thread.
@@ -142,7 +141,7 @@ impl Listener {
     /// Sends the packet to the destination node.
     fn send_packet_to_destination(&self, packet: Packet) {
         if let Some(dest_id) = packet.routing_header.destination() {
-            let mut state = self.state.lock();
+            let state = self.state.lock();
             if let Some((sender, _)) = state.inter_node_channels.get(&dest_id) {
                 if let Err(err) = sender.send(packet) {
                     error!(
