@@ -7,7 +7,6 @@ use crate::simulation::listener::Listener;
 use crate::simulation::state::SimulationState;
 use dotenv::dotenv;
 use parking_lot::Mutex;
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -48,7 +47,6 @@ pub fn run() {
             }
         })
         .manage(state)
-        .manage(Arc::new(Mutex::new(None::<Arc<AtomicBool>>)))
         .invoke_handler(tauri::generate_handler![
             // config
             crate::commands::config::load_config,
@@ -60,8 +58,6 @@ pub fn run() {
             crate::commands::controller::crash_drone, // TODO: rimuoverlo ex crash_command,
             crate::commands::controller::set_pdr,
             crate::commands::controller::send_packet,
-            crate::commands::controller::start_repeated_sending,
-            crate::commands::controller::stop_repeated_sending,
             // settings
             crate::commands::settings::set_discovery_interval,
             crate::commands::settings::get_discovery_interval,

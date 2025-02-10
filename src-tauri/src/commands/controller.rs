@@ -1,12 +1,10 @@
 use crate::error::NetworkError;
 use crate::simulation::state::SimulationState;
 use parking_lot::Mutex;
-use serde_json::json;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, State};
+use tauri::State;
 use wg_2024::network::{NodeId, SourceRoutingHeader};
-use wg_2024::packet::{FloodRequest, FloodResponse, Fragment, Nack, NackType, NodeType, Packet};
+use wg_2024::packet::{FloodRequest, FloodResponse, Fragment, Nack, NackType, Packet};
 
 #[tauri::command]
 pub fn crash_drone(
@@ -32,11 +30,9 @@ pub fn set_pdr(
     Ok(())
 }
 
-// TODO: controllare le funzioni da qui in poi
-
 #[tauri::command]
 pub fn send_packet(
-    state: State<Arc<Mutex<SimulationState>>>,
+    state: tauri::State<Arc<Mutex<SimulationState>>>,
     sender_id: NodeId,
     session_id: u64,
     packet_type: String,
@@ -98,7 +94,6 @@ pub fn send_packet(
                     nack_type: NackType::DestinationIsDrone,
                 },
                 _ => Nack {
-                    // Dropped
                     fragment_index: fi,
                     nack_type: NackType::Dropped,
                 },
@@ -108,7 +103,8 @@ pub fn send_packet(
             do_send_packet(&mut net_state, sender_id, session_id, packet, hops, 0)
         }
         "FloodRequest" => {
-            let flood_request = FloodRequest::initialize(0, sender_id, NodeType::Client);
+            let flood_request =
+                FloodRequest::initialize(0, sender_id, wg_2024::packet::NodeType::Client);
             let routing_header = SourceRoutingHeader::new(hops.clone(), 0);
             let packet = Packet::new_flood_request(routing_header, session_id, flood_request);
             do_send_packet(&mut net_state, sender_id, session_id, packet, hops, 0)
@@ -132,8 +128,8 @@ fn do_send_packet(
     sender_id: NodeId,
     _session_id: u64,
     packet: Packet,
-    hops: Vec<NodeId>,
-    hop_index: usize,
+    mut hops: Vec<NodeId>,
+    mut hop_index: usize,
 ) -> Result<(), NetworkError> {
     if !state.get_inter_node_channels().contains_key(&sender_id) {
         let available_nodes = state
@@ -148,8 +144,7 @@ fn do_send_packet(
         )));
     }
 
-    let mut hops = hops;
-    let mut hop_index = hop_index;
+    // Ensure the sender is at the beginning of the hops list.
     if hops.first().copied() != Some(sender_id) {
         log::debug!(
             "Adding sender ID {} to the beginning of the hops list",
@@ -158,8 +153,6 @@ fn do_send_packet(
         hops.insert(0, sender_id);
         hop_index += 1;
     }
-    // let routing_header = SourceRoutingHeader::new(hops.clone(), hop_index);
-    // (Assume that packet’s routing_header is set appropriately.)
     let next_node = hops.get(hop_index).copied().ok_or_else(|| {
         NetworkError::ValidationError(format!(
             "Invalid hop_index {} for a route of length {}",
@@ -184,198 +177,4 @@ fn do_send_packet(
         packet
     );
     Ok(())
-}
-
-// --- Command: Start Repeated Sending ---
-#[tauri::command]
-pub fn start_repeated_sending(
-    app_handle: AppHandle,
-    // Global network state (managed via Tauri)
-    state: State<Arc<Mutex<SimulationState>>>,
-    // Packet parameters:
-    sender_id: NodeId,
-    session_id: u64,
-    packet_type: String,
-    hops: Vec<NodeId>,
-    fragment_index: Option<u64>,
-    total_fragments: Option<u64>,
-    data: Option<String>,
-    nack_type: Option<String>,
-    error_node: Option<NodeId>,
-    batch_count: u64,
-    interval: u64,
-    random_mode: bool,
-    // The repeated sender state – a shared Option<Arc<AtomicBool>>
-    repeated_state: State<Arc<Mutex<Option<Arc<AtomicBool>>>>>,
-) -> Result<(), String> {
-    // Lock our repeated state.
-    let mut rep_state = repeated_state.lock();
-    if rep_state.is_some() {
-        return Err("A sending job is already running".into());
-    }
-    // Create a cancellation flag.
-    let cancel_flag = Arc::new(AtomicBool::new(false));
-    *rep_state = Some(cancel_flag.clone());
-    // Clone the repeated state Arc so we can clear it later.
-    let repeated_state_arc = repeated_state.inner().clone();
-
-    let app_handle_clone = app_handle.clone();
-    let hops_clone = hops.clone();
-    // Extract the inner network state Arc so that it becomes 'static.
-    let state_arc = state.inner().clone();
-
-    std::thread::spawn(move || {
-        let mut sent = 0;
-        while sent < batch_count && !cancel_flag.load(Ordering::Relaxed) {
-            // If random_mode is enabled, generate randomized values.
-            let (sid, sess_id, pkt_type, frag_idx, tot_frag, pkt_data, nack, err_node, route) =
-                if random_mode {
-                    (
-                        // Random sender id between 1 and 10:
-                        (rand::random::<u8>() % 10) + 1,
-                        rand::random::<u64>() % 10000,
-                        packet_type.clone(),
-                        Some(rand::random::<u64>() % 10),
-                        if packet_type == "MsgFragment" {
-                            Some((rand::random::<u64>() % 10) + 1)
-                        } else {
-                            None
-                        },
-                        Some("Random Data".to_string()),
-                        if packet_type == "Nack" {
-                            Some("Dropped".to_string())
-                        } else {
-                            None
-                        },
-                        if packet_type == "Nack" {
-                            Some((rand::random::<u8>() % 10) + 1)
-                        } else {
-                            None
-                        },
-                        hops_clone.clone(),
-                    )
-                } else {
-                    (
-                        sender_id,
-                        session_id,
-                        packet_type.clone(),
-                        fragment_index,
-                        total_fragments,
-                        data.clone(),
-                        nack_type.clone(),
-                        error_node,
-                        hops_clone.clone(),
-                    )
-                };
-
-            let send_result = {
-                // Use our cloned network state (an owned Arc<Mutex<SimulationState>>)
-                let mut net_state = state_arc.lock();
-                match pkt_type.as_str() {
-                    "MsgFragment" => {
-                        let fi = frag_idx.expect("fragment_index missing");
-                        let tot = tot_frag.unwrap_or(1);
-                        let data_str = pkt_data.unwrap_or_default();
-                        let fragment = Fragment::from_string(fi, tot, data_str);
-                        let routing_header = SourceRoutingHeader::new(route.clone(), 0);
-                        let packet = Packet::new_fragment(routing_header, sess_id, fragment);
-                        do_send_packet(&mut net_state, sid, sess_id, packet, route.clone(), 0)
-                    }
-                    "Ack" => {
-                        let fi = frag_idx.expect("fragment_index missing");
-                        let routing_header = SourceRoutingHeader::new(route.clone(), 0);
-                        let packet = Packet::new_ack(routing_header, sess_id, fi);
-                        do_send_packet(&mut net_state, sid, sess_id, packet, route.clone(), 0)
-                    }
-                    "Nack" => {
-                        let fi = frag_idx.expect("fragment_index missing");
-                        let nt = nack.unwrap_or_else(|| "Dropped".into());
-                        let nack_packet = match nt.as_str() {
-                            "ErrorInRouting" => {
-                                let enode =
-                                    err_node.expect("error_node required for ErrorInRouting");
-                                Nack {
-                                    fragment_index: fi,
-                                    nack_type: NackType::ErrorInRouting(enode),
-                                }
-                            }
-                            "UnexpectedRecipient" => {
-                                let enode =
-                                    err_node.expect("error_node required for UnexpectedRecipient");
-                                Nack {
-                                    fragment_index: fi,
-                                    nack_type: NackType::UnexpectedRecipient(enode),
-                                }
-                            }
-                            "DestinationIsDrone" => Nack {
-                                fragment_index: fi,
-                                nack_type: NackType::DestinationIsDrone,
-                            },
-                            _ => Nack {
-                                fragment_index: fi,
-                                nack_type: NackType::Dropped,
-                            },
-                        };
-                        let routing_header = SourceRoutingHeader::new(route.clone(), 0);
-                        let packet = Packet::new_nack(routing_header, sess_id, nack_packet);
-                        do_send_packet(&mut net_state, sid, sess_id, packet, route.clone(), 0)
-                    }
-                    "FloodRequest" => {
-                        let flood_request = FloodRequest::initialize(0, sid, NodeType::Client);
-                        let routing_header = SourceRoutingHeader::new(route.clone(), 0);
-                        let packet =
-                            Packet::new_flood_request(routing_header, sess_id, flood_request);
-                        do_send_packet(&mut net_state, sid, sess_id, packet, route.clone(), 0)
-                    }
-                    "FloodResponse" => {
-                        let flood_response = FloodResponse {
-                            flood_id: 0,
-                            path_trace: vec![],
-                        };
-                        let routing_header = SourceRoutingHeader::new(route.clone(), 0);
-                        let packet =
-                            Packet::new_flood_response(routing_header, sess_id, flood_response);
-                        do_send_packet(&mut net_state, sid, sess_id, packet, route.clone(), 0)
-                    }
-                    _ => Err(NetworkError::Other("Invalid packet type".into())),
-                }
-            };
-
-            if let Err(e) = send_result {
-                log::error!("Failed to send packet {}: {:?}", sent, e);
-            } else {
-                sent += 1;
-            }
-            // Emit a status update to the frontend.
-            let status = json!({ "sent": sent, "remaining": batch_count - sent });
-            app_handle_clone
-                .emit("packet-sending-status", status)
-                .unwrap();
-            std::thread::sleep(std::time::Duration::from_millis(interval));
-        }
-        // When finished (or cancelled), clear the repeated state.
-        repeated_state_arc.lock().take();
-        // Emit a completion event.
-        let complete = json!({ "sent": sent });
-        app_handle_clone
-            .emit("packet-sending-complete", complete)
-            .unwrap();
-    });
-
-    Ok(())
-}
-
-// --- Command: Stop Repeated Sending ---
-#[tauri::command]
-pub fn stop_repeated_sending(
-    repeated_state: State<Arc<Mutex<Option<Arc<AtomicBool>>>>>,
-) -> Result<(), String> {
-    let mut rep_state = repeated_state.lock();
-    if rep_state.is_some() {
-        // Take the cancellation flag out (this sets the state back to None).
-        rep_state.take();
-        Ok(())
-    } else {
-        Err("No sending job is currently running".into())
-    }
 }

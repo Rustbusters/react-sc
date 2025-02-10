@@ -109,14 +109,14 @@ const DronesTab = ({ selectedDroneId }: { selectedDroneId: NetworkNode | null })
               <Line
                 dataKey="sent"
                 type="monotone"
-                stroke="hsl(var(--chart-1))"
+                stroke="hsl(var(--chart-3))"
                 strokeWidth={ 2 }
                 dot={ false }
               />
               <Line
                 dataKey="dropped"
                 type="monotone"
-                stroke="hsl(var(--chart-2))"
+                stroke="hsl(var(--chart-5))"
                 strokeWidth={ 2 }
                 dot={ false }
               />

@@ -63,7 +63,7 @@ const PacketTypeBarChart: React.FC<PacketTypeBarChartProps> = ({ packetData, cla
               axisLine={ false }
             />
             <ChartTooltip cursor={ false } content={ <ChartTooltipContent hideLabel/> }/>
-            <Bar dataKey="count" fill="var(--color-desktop)" radius={ 8 }>
+            <Bar dataKey="count" fill="hsl(var(--primary))" radius={ 8 }>
               <LabelList position="top" offset={ 12 } className="fill-foreground" fontSize={ 12 }/>
             </Bar>
           </BarChart>
