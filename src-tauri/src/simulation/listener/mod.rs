@@ -102,7 +102,7 @@ impl Listener {
                     {
                         drone_metric.record_shortcut();
                     }
-                    drop(sim_state); // TODO: check this
+                    drop(sim_state);
                     self.send_packet_to_destination(packet);
                 }
                 _ => {

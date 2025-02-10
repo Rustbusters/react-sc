@@ -101,8 +101,8 @@ const Home = () => {
             <CardTitle>📡 Packet Transmission</CardTitle>
           </CardHeader>
           <CardContent>
-            <p>Send custom packets across the network with custom paths.</p>
-            <p>You can also schedule periodic sending on a separate thread.</p>
+            <p>Send packets of any type within the network, specifying all values such as path, fragment index and
+              content.</p>
             <Button onClick={ () => navigate("/send") } className="mt-4 w-full">
               Go to Packet Sender
             </Button>

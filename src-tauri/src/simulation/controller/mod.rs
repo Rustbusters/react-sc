@@ -15,9 +15,6 @@ pub fn crash_drone(state: &mut SimulationState, drone_id: NodeId) -> Result<(), 
     // Send RemoveSender command to neighbors
     for neighbor in state.get_graph().get_neighbors(drone_id) {
         crate::simulation::controller::controller_commands::send_remove_sender_command(
-            state, drone_id, neighbor,
-        )?;
-        crate::simulation::controller::controller_commands::send_remove_sender_command(
             state, neighbor, drone_id,
         )?;
     }
