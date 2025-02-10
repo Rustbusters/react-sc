@@ -8,7 +8,6 @@ use wg_2024::packet::{FloodRequest, FloodResponse, Fragment, Nack, NackType, Pac
 
 #[tauri::command]
 pub fn crash_drone(
-    // TODO: valutare di rimuoverlo
     state: State<Arc<Mutex<SimulationState>>>,
     drone_id: NodeId,
 ) -> Result<(), NetworkError> {

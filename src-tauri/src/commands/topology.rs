@@ -16,7 +16,6 @@ pub fn remove_node(
     let mut sim_state = state.lock();
 
     if sim_state.get_status() == SimulationStatus::Running {
-        // TODO: migliorare questo pezzo
         let node_type = sim_state
             .get_graph()
             .get_node_type(node_id)
@@ -118,7 +117,6 @@ pub fn add_edge(
     Ok(())
 }
 
-// TODO: refactoring di questa funzione
 #[tauri::command]
 pub fn get_graph(state: State<Arc<Mutex<SimulationState>>>) -> Value {
     let sim_state = state.lock();
@@ -205,7 +203,6 @@ pub fn get_graph(state: State<Arc<Mutex<SimulationState>>>) -> Value {
     })
 }
 
-// TODO: refactoring di questa funzione
 #[tauri::command]
 pub fn get_network_nodes(state: State<Arc<Mutex<SimulationState>>>) -> Result<Value, NetworkError> {
     let sim_state = state.lock();

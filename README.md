@@ -2,7 +2,6 @@
 
 A university project for **Advanced Programming (2024-2025)** at the University of Trento, designed to manage and monitor a **simulated drone network**. This controller offers a **Rust + Tauri** backend and a **React (Tauri)** frontend for **real-time visualization**, **network controls**, and **statistical analysis**.
 
----
 
 ## **1. Introduction**
 
@@ -15,7 +14,6 @@ Welcome to the **Simulation Controller** — a tool that coordinates a network o
 
 ![Home Page](./images/homepage.png)
 
----
 
 ## **2. Main Features**
 
@@ -54,7 +52,6 @@ Welcome to the **Simulation Controller** — a tool that coordinates a network o
 
 ![Settings Page](./images/settings.png)
 
----
 
 ## **3. How It Works**
 

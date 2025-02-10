@@ -12,7 +12,7 @@ use server::utils::traits::Runnable;
 use server::{RustBustersServer, RustBustersServerController};
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
-use std::{thread};
+use std::thread;
 use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::drone::Drone;
 use wg_2024::network::NodeId;
@@ -43,7 +43,6 @@ pub fn init_inter_node_channels(state: &mut SimulationState) -> Result<(), Netwo
         state
             .get_inter_node_channels_mut()
             .insert(drone.id, (sender, receiver));
-        // state.metrics.insert_node(drone.id, NodeType::Drone); // TODO
         state
             .get_metrics_mut()
             .insert_node(drone.id, wg_2024::packet::NodeType::Drone);
@@ -53,7 +52,6 @@ pub fn init_inter_node_channels(state: &mut SimulationState) -> Result<(), Netwo
         state
             .get_inter_node_channels_mut()
             .insert(client.id, (sender, receiver));
-        // state.metrics.insert_node(client.id, NodeType::Client); // TODO
         state
             .get_metrics_mut()
             .insert_node(client.id, wg_2024::packet::NodeType::Client);
@@ -63,7 +61,6 @@ pub fn init_inter_node_channels(state: &mut SimulationState) -> Result<(), Netwo
         state
             .get_inter_node_channels_mut()
             .insert(server.id, (sender, receiver));
-        // state.metrics.insert_node(server.id, NodeType::Server); // TODO
         state
             .get_metrics_mut()
             .insert_node(server.id, wg_2024::packet::NodeType::Server);
@@ -73,18 +70,15 @@ pub fn init_inter_node_channels(state: &mut SimulationState) -> Result<(), Netwo
 }
 
 pub fn initialize_drones(state: &mut SimulationState) -> Result<(), NetworkError> {
-    // Example: build an array with just one drone factory for demonstration
-    // Ensure `RustyDrone` is actually `Send`.
     let drone_factories: Vec<DroneFactory> = drone_factories![
-        // rustbusters_drone::RustBustersDrone, // Non aspetta la chiusura del commands
         rusty_drones::RustyDrone,
         lockheedrustin_drone::LockheedRustin,
         fungi_drone::FungiDrone,
-        rustastic_drone::RustasticDrone, // Come noi
+        rustastic_drone::RustasticDrone,
         rusteze_drone::RustezeDrone,
-        rust_do_it::RustDoIt,     // Come noi
-        rust_roveri::RustRoveri,  // Come noi
-        RF_drone::RustAndFurious, // Come noi
+        rust_do_it::RustDoIt,
+        rust_roveri::RustRoveri,
+        RF_drone::RustAndFurious,
         ap2024_unitn_cppenjoyers_drone::CppEnjoyersDrone,
         wg_2024_rust::drone::RustDrone,
     ];

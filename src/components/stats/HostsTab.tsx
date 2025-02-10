@@ -188,7 +188,7 @@ const HostsTab = ({ selectedHostId }: { selectedHostId: NetworkNode | null }) =>
                 <Line
                   dataKey="latency"
                   type="monotone"
-                  stroke="hsl(var(--chart-1))"
+                  stroke="hsl(var(--chart-3))"
                   strokeWidth={ 2 }
                   dot={ false } // Removes dots from the line
                 />

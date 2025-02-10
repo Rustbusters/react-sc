@@ -55,7 +55,7 @@ pub fn run() {
             crate::commands::config::get_default_configs,
             crate::commands::config::delete_history_config,
             // controller
-            crate::commands::controller::crash_drone, // TODO: rimuoverlo ex crash_command,
+            crate::commands::controller::crash_drone,
             crate::commands::controller::set_pdr,
             crate::commands::controller::send_packet,
             // settings

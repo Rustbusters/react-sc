@@ -13,7 +13,7 @@ impl GraphState {
 
     pub fn build_graph(&mut self, config: &Config) {
         for drone in &config.drone {
-            self.adjacency.entry(drone.id).or_default(); // TODO: remove
+            self.adjacency.entry(drone.id).or_default();
 
             // Insert neighbors
             for &nbr in &drone.connected_node_ids {

@@ -10,7 +10,7 @@ interface GraphEdge {
 
 interface HeatmapGraphProps {
   heatmap: Record<string, number>;
-  nodeTypes: Record<string, "Drone" | "Client" | "Server">;
+  nodeTypes: Record<string, "Drone" | "Client" | "Server" | "Unknown">;
 }
 
 
@@ -77,7 +77,7 @@ const HeatmapGraph = ({ heatmap, nodeTypes }: HeatmapGraphProps) => {
       container: cyRef.current,
       elements: [
         ...Array.from(nodes).map((id) => ({
-          data: { id, label: id, type: nodeTypes[id] || "Client" },
+          data: { id, label: id, type: nodeTypes[id] || "Unknown" },
         })),
         ...edges.map((edge) => ({
           data: { source: edge.source, target: edge.target, weight: edge.weight },
@@ -131,10 +131,11 @@ const HeatmapGraph = ({ heatmap, nodeTypes }: HeatmapGraphProps) => {
   };
 
   const getNodeColor = (type: string): string => {
-    const colors: Record<"Server" | "Drone" | "Client", string> = {
+    const colors: Record<"Server" | "Drone" | "Client" | "Unknown", string> = {
       Server: "#FEFAF4",
       Drone: "#F5FAFA",
       Client: "#F9FBF6",
+      Unknown: "#ddd",
     };
     // QUi tutti sono Client
     return colors[type as keyof typeof colors] || "#ddd";
@@ -142,10 +143,11 @@ const HeatmapGraph = ({ heatmap, nodeTypes }: HeatmapGraphProps) => {
 
   // 🎨 **Colori dei bordi**
   const getNodeBorderColor = (type: string): string => {
-    const borderColors: Record<"Server" | "Drone" | "Client", string> = {
+    const borderColors: Record<"Server" | "Drone" | "Client" | "Unknown", string> = {
       Server: "#EDCB95",
       Drone: "#9ACDC8",
       Client: "#C3D59D",
+      Unknown: "#aaa",
     };
     return borderColors[type as keyof typeof borderColors] || "#aaa";
   };
