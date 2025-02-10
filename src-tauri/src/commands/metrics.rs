@@ -6,7 +6,6 @@ use crate::utils::ControllerEvent;
 use common_utils::HostEvent;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -14,6 +13,7 @@ use tauri::State;
 use wg_2024::controller::DroneEvent;
 use wg_2024::network::NodeId;
 
+/// An event type that wraps the different kinds of events that can be sent.
 #[derive(Serialize, Deserialize, Debug)]
 pub enum EventType {
     PacketSent,
@@ -22,15 +22,17 @@ pub enum EventType {
     HostMessageSent,
 }
 
+/// A message sent from the simulation controller.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Message {
     pub id: usize,
     pub event_type: EventType,
     pub node: NodeId,
-    pub node_type: String, // New field: "Host" or "Drone"
+    pub node_type: String, // e.g. "Host" or "Drone"
     pub packet: String,
 }
 
+/// Returns a list of new messages (already strongly typed) since the provided last ID.
 #[tauri::command]
 pub fn get_new_messages(
     state: State<Arc<Mutex<SimulationState>>>,
@@ -51,7 +53,6 @@ pub fn get_new_messages(
         .map(|(idx, event)| {
             let message_id = start_index + idx;
             match event {
-                // FIXME: panics here
                 ControllerEvent::Drone { node_id, event } => {
                     let node_type = "Drone".to_string();
                     match event {
@@ -90,7 +91,7 @@ pub fn get_new_messages(
                         },
                         HostEvent::PacketSent(packet_header) => Message {
                             id: message_id,
-                            event_type: EventType::PacketSent, // Renamed from HostPacketSent
+                            event_type: EventType::PacketSent,
                             node: *node_id,
                             node_type,
                             packet: format!("{:?}", packet_header),
@@ -109,65 +110,13 @@ pub fn get_new_messages(
         .collect()
 }
 
-#[tauri::command]
-pub fn get_network_infos(state: State<Arc<Mutex<SimulationState>>>) -> Value {
-    let state = state.lock();
-    let graph = state.get_graph();
-
-    let nodes_info: Vec<_> = graph
-        .get_nodes_info()
-        .into_iter()
-        .map(|(node_id, metadata)| create_node_json(node_id, metadata, &state))
-        .collect();
-
-    json!({ "nodes": nodes_info })
+/// A strongly typed response for the network infos command.
+#[derive(Serialize, Deserialize)]
+pub struct NetworkInfos {
+    pub nodes: Vec<NodeInfo>,
 }
 
-/// Genera il JSON per un nodo specifico
-fn create_node_json(node_id: NodeId, metadata: &NodeMetadata, state: &SimulationState) -> Value {
-    let connections = {
-        let mut neighbors = state.get_graph().get_neighbors(node_id);
-        neighbors.sort();
-        neighbors
-    };
-
-    let mut node_data = json!({
-        "node_id": node_id,
-        "type": match metadata {
-            NodeMetadata::Drone(_) => "Drone",
-            NodeMetadata::Client => "Client",
-            NodeMetadata::Server => "Server",
-        },
-        "connections": connections,
-    });
-
-    match metadata {
-        NodeMetadata::Drone(drone_metadata) => {
-            node_data["pdr"] = json!(drone_metadata.get_pdr());
-
-            if let Some(metrics) = state.get_metrics().drone_metrics.get(&node_id) {
-                node_data["current_pdr"] = json!(metrics.current_pdr);
-                node_data["packets_sent"] = json!(metrics.number_of_packets_sent());
-                node_data["packets_dropped"] = json!(metrics.drops);
-                node_data["shortcuts"] = json!(metrics.shortcuts);
-            }
-        }
-        NodeMetadata::Client | NodeMetadata::Server => {
-            if let Some(metrics) = state.get_metrics().host_metrics.get(&node_id) {
-                node_data["packets_sent"] = json!(metrics.number_of_packets_sent());
-                node_data["packets_acked"] = json!(metrics
-                    .dest_stats
-                    .values()
-                    .map(|(_, acked)| acked)
-                    .sum::<u64>());
-                node_data["shortcuts"] = json!(metrics.shortcuts);
-            }
-        }
-    }
-
-    node_data
-}
-
+/// Node information for a single node.
 #[derive(Serialize, Deserialize)]
 pub struct NodeInfo {
     pub node_id: NodeId,
@@ -177,6 +126,7 @@ pub struct NodeInfo {
     pub metrics: NodeMetrics,
 }
 
+/// The metrics for a node.
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "category")]
 pub enum NodeMetrics {
@@ -193,30 +143,16 @@ pub enum NodeMetrics {
         packets_acked: u64,
         shortcuts_used: u64,
         packet_type_counts: HashMap<PacketTypeLabel, u64>,
-        latencies: Vec<u64>, // Millisecondi
+        latencies: Vec<u64>, // in milliseconds
     },
-    None, // Per nodi senza metriche
+    None,
 }
 
-#[tauri::command]
-pub fn get_node_info(
-    state: State<Arc<Mutex<SimulationState>>>,
-    node_id: NodeId,
-) -> Result<NodeInfo, String> {
-    let state = state.lock();
-    let graph = &state.get_graph();
-
-    let metadata = graph
-        .get_node_type(node_id)
-        .ok_or_else(|| format!("Node {} not found", node_id))?;
-
-    let connections = {
-        let mut neighbors = graph.get_neighbors(node_id);
-        neighbors.sort();
-        neighbors
-    };
-
-    let node_info = NodeInfo {
+/// Helper function to convert a node’s raw info into a well-defined NodeInfo.
+fn create_node_info(node_id: NodeId, metadata: &NodeMetadata, state: &SimulationState) -> NodeInfo {
+    let mut connections = state.get_graph().get_neighbors(node_id);
+    connections.sort();
+    NodeInfo {
         node_id,
         node_type: get_node_type_string(metadata),
         node_group: match metadata {
@@ -224,13 +160,11 @@ pub fn get_node_info(
             _ => None,
         },
         connections,
-        metrics: create_node_metrics(node_id, metadata, &state),
-    };
-
-    Ok(node_info)
+        metrics: create_node_metrics(node_id, metadata, state),
+    }
 }
 
-/// Restituisce il tipo del nodo come stringa
+/// Returns the node type as a string.
 fn get_node_type_string(metadata: &NodeMetadata) -> String {
     match metadata {
         NodeMetadata::Drone(_) => "Drone".to_string(),
@@ -239,7 +173,7 @@ fn get_node_type_string(metadata: &NodeMetadata) -> String {
     }
 }
 
-/// Genera le metriche per un nodo
+/// Builds the node metrics in a strongly typed way.
 fn create_node_metrics(
     node_id: NodeId,
     metadata: &NodeMetadata,
@@ -278,6 +212,36 @@ fn create_node_metrics(
     }
 }
 
+/// Returns information on all nodes in the network.
+#[tauri::command]
+pub fn get_network_infos(state: State<Arc<Mutex<SimulationState>>>) -> NetworkInfos {
+    let state = state.lock();
+    let graph = state.get_graph();
+    let mut nodes_info: Vec<NodeInfo> = graph
+        .get_nodes_info()
+        .into_iter()
+        .map(|(node_id, metadata)| create_node_info(node_id, metadata, &state))
+        .collect();
+
+    nodes_info.sort_by_key(|node| node.node_id);
+    NetworkInfos { nodes: nodes_info }
+}
+
+/// Returns information for a single node.
+#[tauri::command]
+pub fn get_node_info(
+    state: State<Arc<Mutex<SimulationState>>>,
+    node_id: NodeId,
+) -> Result<NodeInfo, String> {
+    let state = state.lock();
+    let graph = state.get_graph();
+    let metadata = graph
+        .get_node_type(node_id)
+        .ok_or_else(|| format!("Node {} not found", node_id))?;
+    Ok(create_node_info(node_id, metadata, &state))
+}
+
+/// Overall metrics for the network.
 #[derive(Serialize, Deserialize)]
 pub struct OverviewMetrics {
     total_messages_sent: u64,
@@ -286,6 +250,7 @@ pub struct OverviewMetrics {
     heatmap: HashMap<String, u64>,
 }
 
+/// Returns a strongly typed overview of the network metrics.
 #[tauri::command]
 pub fn get_overview_metrics(
     state: State<Arc<Mutex<SimulationState>>>,
@@ -311,7 +276,7 @@ pub fn get_overview_metrics(
     })
 }
 
-/// Aggrega il conteggio dei pacchetti inviati da droni e host
+/// Aggregates packet counts by type.
 fn aggregate_packets_by_type(metrics: &Metrics) -> HashMap<PacketTypeLabel, u64> {
     let mut packets_by_type: HashMap<PacketTypeLabel, u64> = HashMap::new();
 
@@ -330,7 +295,7 @@ fn aggregate_packets_by_type(metrics: &Metrics) -> HashMap<PacketTypeLabel, u64>
     packets_by_type
 }
 
-/// Converte la heatmap in un formato leggibile (Stringa -> u64)
+/// Formats the global heatmap into a map with string keys.
 fn format_heatmap(global_heatmap: &HashMap<(NodeId, NodeId), u64>) -> HashMap<String, u64> {
     global_heatmap
         .iter()
@@ -338,13 +303,13 @@ fn format_heatmap(global_heatmap: &HashMap<(NodeId, NodeId), u64>) -> HashMap<St
         .collect()
 }
 
+/// Returns the metrics for a given drone node.
 #[tauri::command]
 pub fn get_drone_metrics(
     state: State<Arc<Mutex<SimulationState>>>,
     node_id: NodeId,
 ) -> Result<DroneMetrics, NetworkError> {
     let state = state.lock();
-
     state
         .get_metrics()
         .drone_metrics
@@ -353,6 +318,7 @@ pub fn get_drone_metrics(
         .ok_or_else(|| NetworkError::NodeNotFound(node_id.to_string()))
 }
 
+/// Host metrics (including latencies and time series) for a given node.
 #[derive(Serialize, Deserialize)]
 pub struct HostStats {
     latencies: Vec<Duration>,
@@ -360,6 +326,7 @@ pub struct HostStats {
     time_series: Vec<HostMetricsTimePoint>,
 }
 
+/// Returns the metrics for a given host node.
 #[tauri::command]
 pub fn get_host_metrics(
     state: State<Arc<Mutex<SimulationState>>>,

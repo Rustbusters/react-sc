@@ -215,7 +215,7 @@ const Settings = () => {
         </div>
 
         <div className="col-span-2">
-          <h2 className="text-lg font-semibold mb-2">Upload Configurazione</h2>
+          <h2 className="text-lg font-semibold mb-2">Upload Configuration</h2>
           <div className="flex space-x-2">
             <Input
               value={ configPath }
@@ -231,8 +231,8 @@ const Settings = () => {
             </Button>
           </div>
 
-          {/* Cronologia */ }
-          <h2 className="text-lg font-semibold mt-6 mb-2">Cronologia</h2>
+          {/* History */ }
+          <h2 className="text-lg font-semibold mt-6 mb-2">History</h2>
           <div className="space-y-2 max-h-72 overflow-y-auto select-none">
             { historyConfigs.map((config) => (
               <div key={ config.id }
@@ -304,8 +304,8 @@ const Settings = () => {
               } }
               className="flex-1"
             />
-            <Button onClick={ () => {
-              invoke("set_discovery_interval", { interval: discoveryInterval })
+            <Button onClick={ async () => {
+              await invoke("set_discovery_interval", { interval: discoveryInterval })
               setDiscoveryIntervalSent(true);
             } }
                     disabled={ discoveryIntervalSent || status === "Running" }>

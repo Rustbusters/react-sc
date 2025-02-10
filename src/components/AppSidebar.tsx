@@ -107,7 +107,7 @@ export function AppSidebar() {
                     <SidebarMenuButton asChild>
                       <NavLink
                         to={ (item.url === "/stats" && status !== "Running") ? "#" : item.url }
-                        className={ isActive ? "font-bold" : "" }
+                        className={ `${ isActive ? "font-bold" : "" } ${ (item.url === "/stats" && status !== "Running") ? "pointer-events-none opacity-50" : "" }` }
                       >
                         <item.icon strokeWidth={ isActive ? 3 : 2 } style={ { transition: 'stroke-width 0.2s ease' } }/>
                         <span>{ item.title }</span>

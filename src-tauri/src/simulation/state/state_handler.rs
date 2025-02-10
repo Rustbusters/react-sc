@@ -253,8 +253,9 @@ impl SimulationState {
         self.drones_controller_channels.clear();
         self.client_controller_channels.clear();
         self.server_controller_channels.clear();
-        self.graph.node_info.clear();
-        self.graph.adjacency.clear();
+        self.graph = Default::default();
+        self.metrics = Default::default();
+        self.received_messages.clear();
 
         for (node_id, handle) in self.node_threads.drain() {
             info!("Attempting to join thread for node {}", node_id);
