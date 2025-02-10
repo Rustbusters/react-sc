@@ -339,19 +339,16 @@ fn config_server_controller() -> (
     Receiver<HostCommand>,
 ) {
     info!("Reading server configuration from .env file");
-    let server_ip: [u8; 4] = env::var("SERVER_IP")
-        .expect("SERVER_IP must be set in .env file")
+    let server_ip: [u8; 4] = "127.0.0.1"
         .parse::<Ipv4Addr>()
         .expect("SERVER_IP must be a valid IpV4 IP address")
         .octets();
     info!("Server IP: {:?}", server_ip);
-    let port = env::var("SERVER_PORT")
-        .expect("SERVER_PORT must be set in .env file")
+    let port = "8080"
         .parse::<u16>()
         .expect("Error in parsing HTTP_SERVER_PORT from .env");
     info!("Server port: {:?}", port);
-    let http_public_path =
-        env::var("SERVER_PUBLIC_PATH").expect("SERVER_PUBLIC_PATH must be set in .env file");
+    let http_public_path = "static/server/frontend/build".to_string();
     info!("Server public path: {:?}", http_public_path);
 
     let ip_str: String = server_ip
