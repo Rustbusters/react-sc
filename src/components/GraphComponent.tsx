@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { getCssVariableAsRGB } from "@/lib/utils";
+import { extractErrorMessage, getCssVariableAsRGB } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface GraphComponentProps {
@@ -342,7 +342,7 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
       await loadGraphData();
     } catch (error: any) {
       console.error("Error while adding the node:", error);
-      const errorMessage = error?.message || "Error while adding the node.";
+      const errorMessage = extractErrorMessage(error);
       toast.error(errorMessage);
     }
   };
@@ -422,9 +422,9 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
             <div className="flex flex-wrap gap-2 mt-1">
               { cy &&
                 cy.nodes().sort((a, b) => {
-                  const idA = parseInt(a.id(), 10); // Converti l'ID in numero
+                  const idA = parseInt(a.id(), 10);
                   const idB = parseInt(b.id(), 10);
-                  return idA - idB; // Ordine numerico crescente
+                  return idA - idB;
                 }).map((node) => (
                   <label key={ node.id() } className="flex items-center gap-2">
                     <Checkbox

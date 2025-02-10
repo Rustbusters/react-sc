@@ -1,4 +1,6 @@
-use crate::simulation::metrics::{DroneMetrics, HostMetrics, HostMetricsTimePoint, Metrics, MetricsTimePoint, PacketTypeLabel};
+use crate::simulation::metrics::{
+    DroneMetrics, HostMetrics, HostMetricsTimePoint, Metrics, MetricsTimePoint, PacketTypeLabel,
+};
 use common_utils::PacketTypeHeader;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use wg_2024::network::NodeId;
@@ -51,7 +53,7 @@ impl Metrics {
     pub fn update_host_message_sent(
         &mut self,
         node_id: NodeId,
-        destination: NodeId,
+        _destination: NodeId,
         latency: Duration,
     ) {
         if let Some(host_metrics) = self.host_metrics.get_mut(&node_id) {
@@ -84,7 +86,6 @@ impl Metrics {
         *self.global_heatmap.entry((src, dest)).or_insert(0) += 1;
     }
 }
-
 
 impl crate::simulation::metrics::HostMetrics {
     pub fn record_packet(&mut self, dest: NodeId, packet_type: PacketTypeLabel) {
@@ -144,7 +145,6 @@ impl crate::simulation::metrics::HostMetrics {
         self.latencies.len() as u64
     }
 }
-
 
 impl crate::simulation::metrics::DroneMetrics {
     pub fn number_of_packets_sent(&self) -> u64 {

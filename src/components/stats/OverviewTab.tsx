@@ -23,7 +23,6 @@ const OverviewTab = () => {
     try {
       const response: OverviewMetrics = await invoke("get_overview_metrics");
       setData(response);
-      console.log(response.heatmap);
     } catch (error) {
       console.error("Error fetching metrics:", error);
       toast.error("Error fetching metrics.");
@@ -58,7 +57,6 @@ const OverviewTab = () => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === "r") {
         event.preventDefault(); // Prevent browser refresh
-        console.log("Refreshing data...");
         fetchMetrics().then(r => r);
         fetchNodeTypes().then(r => r)
       }

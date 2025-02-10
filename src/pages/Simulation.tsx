@@ -16,10 +16,10 @@ const Simulation = () => {
   return (
     <div className="flex flex-col w-full h-full select-none">
       <div className="flex flex-1 overflow-y-scroll">
-        <div className="w-1/2 h-full">
+        <div className={ `${ status === "Running" ? "w-1/2" : "w-full" } h-full` }>
           <GraphComponent onNodeSelect={ setSelectedNode } setRefreshGraph={ setRefreshGraph }/>
         </div>
-        <div className="w-1/2 h-full">
+        <div className={ `${ status === "Running" ? "w-1/2" : "hidden" } h-full` }>
           <NetworkInfos/>
         </div>
       </div>

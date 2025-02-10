@@ -25,3 +25,17 @@ export const hslToRgb = (hsl: string) => {
 
   return `rgb(${ Math.round(f(0) * 255) }, ${ Math.round(f(8) * 255) }, ${ Math.round(f(4) * 255) })`;
 };
+
+
+export function extractErrorMessage(error: unknown): string {
+  if (typeof error === "string") {
+    return error;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "object" && error !== null) {
+    return (error as any).message || JSON.stringify(error);
+  }
+  return "Unknown error";
+}

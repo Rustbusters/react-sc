@@ -161,9 +161,7 @@ export default function SendPacketForm() {
     try {
       const hopsArray = data.hops.split(",").map((id: string) => Number(id.trim()));
       // If batch sending or random mode is requested, use repeated sending:
-      console.log(data);
       if (data.randomMode || (data.batchCount && data.batchCount > 1)) {
-        console.log("Starting repeated sending");
         await startRepeatedSending(data, hopsArray);
       } else {
         await handleSinglePacket(data, hopsArray);
@@ -184,7 +182,6 @@ export default function SendPacketForm() {
       updateLocalStorage(sent, remaining);
     });
     const unlistenComplete = listen("packet-sending-complete", (event: any) => {
-      console.log("Sending complete:", event.payload);
       setIsSending(false);
       setProgressData({ sent: event.payload.sent, remaining: 0 });
       toast.dismiss();

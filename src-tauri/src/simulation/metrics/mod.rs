@@ -7,7 +7,7 @@ use std::time::Duration;
 use wg_2024::network::NodeId;
 use wg_2024::packet::PacketType;
 
-const ROLLING_WINDOW_SIZE: usize = 100;
+const ROLLING_WINDOW_SIZE: usize = 1000;
 
 #[derive(Debug, Default)]
 pub struct Metrics {
@@ -52,8 +52,12 @@ impl From<&PacketType> for crate::simulation::metrics::PacketTypeLabel {
             PacketType::MsgFragment(_) => crate::simulation::metrics::PacketTypeLabel::MsgFragment,
             PacketType::Ack(_) => crate::simulation::metrics::PacketTypeLabel::Ack,
             PacketType::Nack(_) => crate::simulation::metrics::PacketTypeLabel::Nack,
-            PacketType::FloodRequest(_) => crate::simulation::metrics::PacketTypeLabel::FloodRequest,
-            PacketType::FloodResponse(_) => crate::simulation::metrics::PacketTypeLabel::FloodResponse,
+            PacketType::FloodRequest(_) => {
+                crate::simulation::metrics::PacketTypeLabel::FloodRequest
+            }
+            PacketType::FloodResponse(_) => {
+                crate::simulation::metrics::PacketTypeLabel::FloodResponse
+            }
         }
     }
 }
@@ -61,7 +65,9 @@ impl From<&PacketType> for crate::simulation::metrics::PacketTypeLabel {
 impl From<&PacketTypeHeader> for crate::simulation::metrics::PacketTypeLabel {
     fn from(pt: &PacketTypeHeader) -> Self {
         match pt {
-            PacketTypeHeader::MsgFragment => crate::simulation::metrics::PacketTypeLabel::MsgFragment,
+            PacketTypeHeader::MsgFragment => {
+                crate::simulation::metrics::PacketTypeLabel::MsgFragment
+            }
             PacketTypeHeader::Ack => crate::simulation::metrics::PacketTypeLabel::Ack,
             PacketTypeHeader::FloodRequest => {
                 crate::simulation::metrics::PacketTypeLabel::FloodRequest

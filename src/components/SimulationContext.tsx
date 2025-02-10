@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { toast } from "sonner";
+import { extractErrorMessage } from "@/lib/utils.ts";
 
 type NetworkStatus = "Init" | "Running" | "Stopped";
 
@@ -95,19 +96,6 @@ export const SimulationProvider = ({ children }: { children: React.ReactNode }) 
     };
   }, []);
 
-
-  function extractErrorMessage(error: unknown): string {
-    if (typeof error === "string") {
-      return error;
-    }
-    if (error instanceof Error) {
-      return error.message;
-    }
-    if (typeof error === "object" && error !== null) {
-      return (error as any).message || JSON.stringify(error);
-    }
-    return "Unknown error";
-  }
 
   const startNetwork = async () => {
     try {

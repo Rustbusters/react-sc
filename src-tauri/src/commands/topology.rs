@@ -68,7 +68,7 @@ pub fn add_node(
     node_type: String, // Drone, Client, Server
 ) -> Result<(), NetworkError> {
     let mut sim_state = state.lock();
-    
+
     let node_type = match node_type.as_str() {
         "Drone" => NodeType::Drone,
         "Client" => NodeType::Client,
@@ -214,10 +214,11 @@ pub fn get_network_nodes(state: State<Arc<Mutex<SimulationState>>>) -> Result<Va
         return Err(NetworkError::NetworkNotRunning);
     }
 
-    let nodes_json: Vec<Value> = sim_state
-        .get_graph()
-        .get_nodes_info()
-        .iter()
+    let mut nodes_info: Vec<_> = sim_state.get_graph().get_nodes_info().into_iter().collect();
+    nodes_info.sort_by_key(|(node_id, _)| *node_id);
+
+    let nodes_json: Vec<Value> = nodes_info
+        .into_iter()
         .map(|(node_id, metadata)| match metadata {
             crate::simulation::topology::NodeMetadata::Drone(drone) => {
                 json!({

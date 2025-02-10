@@ -12,7 +12,7 @@ use server::utils::traits::Runnable;
 use server::{RustBustersServer, RustBustersServerController};
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
-use std::{env, thread};
+use std::{thread};
 use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::drone::Drone;
 use wg_2024::network::NodeId;
