@@ -12,10 +12,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle
-} from "@/components/ui/dialog.tsx";
-import { Input } from "@/components/ui/input.tsx";
-import { Checkbox } from "@/components/ui/checkbox.tsx";
-import { getCssVariableAsRGB } from "@/lib/utils.ts";
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { getCssVariableAsRGB } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface GraphComponentProps {
   onNodeSelect: (nodeId: string | null) => void;
@@ -30,7 +31,13 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [connectedNodes, setConnectedNodes] = useState<Record<string, boolean>>({});
   const [pdr, setPdr] = useState<number>(0.10);
+  const [nodeType, setNodeType] = useState<"drone" | "client" | "server">("drone");
 
+  useEffect(() => {
+    if (status === "Running") {
+      setNodeType("drone");
+    }
+  }, [status]);
 
   const saveGraphLayout = () => {
     if (!cy) return;
@@ -49,7 +56,8 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
 
   const removeGraphElement = (id: string, type: "node" | "edge") => {
     if (!cy) return;
-    const element = type === "node" ? cy.$(`#${ id }`) : cy.$(`edge[source="${ id }"], edge[target="${ id }"]`);
+    const element =
+      type === "node" ? cy.$(`#${ id }`) : cy.$(`edge[source="${ id }"], edge[target="${ id }"]`);
     element.remove();
   };
 
@@ -87,8 +95,7 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
       // Aggiunta degli archi
       response.drones.forEach((drone) => {
         drone.connected_node_ids.forEach((nodeId) => {
-          if (drone.id < nodeId) return; // Evita di aggiungere archi duplicati
-
+          if (drone.id < nodeId) return; // Evita duplicati
           elements.push({
             data: { source: drone.id, target: nodeId },
           });
@@ -97,8 +104,7 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
 
       response.servers.forEach((server) => {
         server.connected_drone_ids.forEach((droneId) => {
-          if (server.id < droneId) return; // Evita di aggiungere archi duplicati
-
+          if (server.id < droneId) return;
           elements.push({
             data: { source: server.id, target: droneId },
           });
@@ -107,20 +113,19 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
 
       response.clients.forEach((client) => {
         client.connected_drone_ids.forEach((droneId) => {
-          if (client.id < droneId) return; // Evita di aggiungere archi duplicati
-
+          if (client.id < droneId) return;
           elements.push({
             data: { source: client.id, target: droneId },
           });
         });
       });
 
-      // Check if the graph is different from the current one
+      // Se il grafo è cambiato, ricarica gli elementi
       if (isGraphDifferent(elements)) {
         cy.elements().remove();
         cy.add(elements);
 
-        // Restore the saved layout
+        // Ripristina il layout salvato
         const savedLayout = sessionStorage.getItem("graph_layout");
         if (savedLayout) {
           const positions = JSON.parse(savedLayout);
@@ -128,7 +133,6 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
             cy.$(`#${ node.id }`).position(node.position);
           });
         }
-
         cy.layout({ name: "cose" }).run();
       }
     } catch (error) {
@@ -137,7 +141,7 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
     }
   }, [cy]);
 
-  // Initialization of the graph
+  // Inizializza Cytoscape
   useEffect(() => {
     if (!cyRef.current) return;
 
@@ -165,7 +169,6 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
             "font-size": "12px",
             color: "#000",
             "text-outline-color": "#000",
-            // 'text-outline-width': '1px'
           },
         },
         {
@@ -218,27 +221,22 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
     };
   }, []);
 
-  // Update of the graph layout when the window is resized
   useEffect(() => {
     if (!cy) return;
     const resizeObserver = new ResizeObserver(() => {
       cy.resize();
       cy.fit();
     });
-
     if (cyRef.current) {
       resizeObserver.observe(cyRef.current);
     }
-
     return () => {
       resizeObserver.disconnect();
     };
   }, [cy]);
 
-  // Remove selected nodes and edges when the backspace key is pressed
   useEffect(() => {
     if (!cy || status === "Running") return;
-
     const handleKeyDown = async (event: KeyboardEvent) => {
       if (event.key !== "Backspace") return;
       event.preventDefault();
@@ -249,7 +247,6 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
       if (selectedNodes.length > 0) {
         for (const node of selectedNodes) {
           const nodeId = node.id();
-          console.log(`Removing node: ${ nodeId }`);
           await invoke("remove_node", { nodeId: Number(nodeId) });
           removeGraphElement(nodeId, "node");
         }
@@ -260,7 +257,6 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
         for (const edge of selectedEdges) {
           const source = edge.source().id();
           const target = edge.target().id();
-          console.log(`Removing edge: ${ source } - ${ target }`);
           await invoke("remove_edge", { node1Id: Number(source), node2Id: Number(target) });
           removeGraphElement(edge.id(), "edge");
         }
@@ -274,24 +270,18 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [cy, loadGraphData, status]);
 
-
+  // Gestione della selezione dei nodi
   useEffect(() => {
     if (!cy) return;
-
     const handleSelect = (event: cytoscape.EventObject) => {
       const nodeId = event.target.id();
-      console.log("Nodo selezionato:", nodeId);
-      onNodeSelect(nodeId); // Passa l'ID selezionato a `App.tsx`
+      onNodeSelect(nodeId);
     };
-
     const handleUnselect = () => {
-      console.log("Nessun nodo selezionato");
-      onNodeSelect(null); // Quando nessun nodo è selezionato, invia `null`
+      onNodeSelect(null);
     };
-
     cy.on("select", "node", handleSelect);
     cy.on("unselect", "node", handleUnselect);
-
     return () => {
       cy.off("select", "node", handleSelect);
       cy.off("unselect", "node", handleUnselect);
@@ -300,40 +290,30 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
 
   useEffect(() => {
     if (!cy) return;
-
     const updateZoom = () => {
       setZoomLevel(cy.zoom());
     };
-
     cy.on("zoom", updateZoom);
-
     return () => {
       cy.off("zoom", updateZoom);
     };
   }, [cy]);
 
-
   useEffect(() => {
     if (!cy) return;
-
-    const handleSelect = (event: cytoscape.EventObject) => {
+    const handleTap = (event: cytoscape.EventObject) => {
       const nodeId = event.target.id();
-      console.log("Nodo selezionato:", nodeId);
       onNodeSelect(nodeId);
     };
-
-    cy.on("tap", "node", handleSelect);
-
+    cy.on("tap", "node", handleTap);
     return () => {
-      cy.off("tap", "node", handleSelect);
+      cy.off("tap", "node", handleTap);
     };
   }, [cy, onNodeSelect]);
 
-  // Carica i dati del grafo quando `cy` è pronto
   useEffect(() => {
     if (cy) {
-      loadGraphData().then(() => {
-      });
+      loadGraphData();
     }
   }, [cy, loadGraphData]);
 
@@ -341,56 +321,44 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
     setRefreshGraph(() => loadGraphData);
   }, [loadGraphData, setRefreshGraph]);
 
-  /*const getCyclicGridSize = (zoom: number) => {
-    const baseSize = 20;
-    const maxScale = 35;
-
-    return baseSize * Math.pow(2, (Math.log2(zoom) % Math.log2(maxScale / baseSize)));
-  };*/
-
-  const handleAddDrone = async () => {
+  const handleAddNode = async () => {
     try {
-      const selectedNodes = Object.keys(connectedNodes).filter((id) => connectedNodes[id]);
-      const newDroneId = await invoke<number>("add_drone", { // TODO: finire questo
-        connectedNodeIds: selectedNodes.map(Number),
-        pdr: Number(pdr),
-      });
+      const neighborIds = Object.keys(connectedNodes)
+        .filter((id) => connectedNodes[id])
+        .map((id) => Number(id));
 
-      toast.success(`Drone ${ newDroneId } added successfully!`);
+      const pdrValue = nodeType === "drone" ? Math.round(pdr * 100) : null;
+
+      await invoke("add_node", {
+        neighbors: neighborIds,
+        pdr: pdrValue,
+        nodeType: nodeType.charAt(0).toUpperCase() + nodeType.slice(1),
+      });
+      toast.success(
+        `${ nodeType.charAt(0).toUpperCase() + nodeType.slice(1) } added successfully!`
+      );
+      setConnectedNodes({});
       setIsDialogOpen(false);
       await loadGraphData();
-    } catch (error) {
-      console.error("Error while adding the drone:", error);
-      toast.error("Error while adding the drone.");
+    } catch (error: any) {
+      console.error("Error while adding the node:", error);
+      const errorMessage = error?.message || "Error while adding the node.";
+      toast.error(errorMessage);
     }
   };
 
-
   return (
     <div className="relative flex flex-col h-full w-full min-w-0 overflow-hidden rounded-lg">
-      <div
-        ref={ cyRef }
-        className="flex-grow w-full h-full rounded-lg"
-        /*style={ {
-          backgroundColor: "white",
-          backgroundImage: "radial-gradient(circle, rgba(0, 0, 0, 0.3) 1px, transparent 1px)",
-          backgroundSize: `${ getCyclicGridSize(zoomLevel) }px ${ getCyclicGridSize(zoomLevel) }px`,
-          backgroundPosition: "center",
-        } }*/
-      />
+      <div ref={ cyRef } className="flex-grow w-full h-full rounded-lg"/>
 
       <div className="flex items-center gap-4 absolute bottom-4 right-4 z-10">
-        <Button
-          onClick={ () => setIsDialogOpen(true) }
-          className="p-2 aspect-square"
-        >
+        <Button onClick={ () => setIsDialogOpen(true) } className="p-2 aspect-square">
           <PlusCircle className="w-5 h-5"/>
         </Button>
-
         <Button
           onClick={ () => {
             saveGraphLayout();
-            loadGraphData().then(r => r);
+            loadGraphData();
           } }
           className="p-2 aspect-square"
         >
@@ -398,33 +366,66 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
         </Button>
       </div>
 
-      {/* Dialog to Add a Node */ }
       <Dialog open={ isDialogOpen } onOpenChange={ setIsDialogOpen }>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add a New Drone</DialogTitle>
-            <DialogDescription>Configure the new drone before adding it to the network.</DialogDescription>
+            <DialogTitle>Add a New Node</DialogTitle>
+            <DialogDescription>
+              Configure the new node before adding it to the network.
+            </DialogDescription>
           </DialogHeader>
 
-          {/* Input for PDR */ }
-          <div>
-            <label className="text-sm font-semibold">Packet Drop Rate (PDR)</label>
-            <Input
-              type="number"
-              step="0.1"
-              min="0"
-              max="1"
-              value={ pdr }
-              onChange={ (e) => setPdr(parseFloat(e.target.value)) }
-            />
+          {/* Selezione del tipo di nodo */ }
+          <div className="mb-4">
+            <label className="block text-sm font-semibold">Node Type</label>
+            <Select
+              value={ nodeType }
+              onValueChange={ (value) => setNodeType(value as "drone" | "client" | "server") }
+              disabled={ status === "Running" }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select node type"/>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="drone">Drone</SelectItem>
+                <SelectItem value="client">Client</SelectItem>
+                <SelectItem value="server">Server</SelectItem>
+              </SelectContent>
+            </Select>
+            { status === "Running" && (
+              <p className="text-xs text-gray-500 mt-1">
+                Only drones can be added while the simulation is running.
+              </p>
+            ) }
           </div>
 
-          {/* Selection of Connected Nodes */ }
-          <div>
+          {/* Se il nodo è un drone, mostra i campi specifici */ }
+          { nodeType === "drone" && (
+            <>
+              <div className="mb-4">
+                <label className="text-sm font-semibold">Packet Drop Rate (PDR)</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="1"
+                  value={ pdr }
+                  onChange={ (e) => setPdr(parseFloat(e.target.value)) }
+                />
+              </div>
+            </>
+          ) }
+
+          {/* Selezione dei nodi da connettere */ }
+          <div className="mb-4">
             <label className="text-sm font-semibold">Connected Nodes</label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mt-1">
               { cy &&
-                cy.nodes().map((node) => (
+                cy.nodes().sort((a, b) => {
+                  const idA = parseInt(a.id(), 10); // Converti l'ID in numero
+                  const idB = parseInt(b.id(), 10);
+                  return idA - idB; // Ordine numerico crescente
+                }).map((node) => (
                   <label key={ node.id() } className="flex items-center gap-2">
                     <Checkbox
                       checked={ connectedNodes[node.id()] || false }
@@ -435,14 +436,14 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
                         }))
                       }
                     />
-                    { node.id() }
+                    { node.data("label") || node.id() }
                   </label>
                 )) }
             </div>
           </div>
 
           <DialogFooter>
-            <Button onClick={ handleAddDrone }>Add</Button>
+            <Button onClick={ handleAddNode }>Add Node</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

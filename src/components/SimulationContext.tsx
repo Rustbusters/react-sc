@@ -1,9 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { toast } from "sonner"
+import { toast } from "sonner";
 
-// Possible network states
 type NetworkStatus = "Init" | "Running" | "Stopped";
 
 const SimulationContext = createContext<{
@@ -38,16 +37,23 @@ const SimulationContext = createContext<{
   },
 });
 
-// Custom hook to access the simulation context
+// Custom hook per accedere al contesto
 export const useSimulation = () => useContext(SimulationContext);
 
 export const SimulationProvider = ({ children }: { children: React.ReactNode }) => {
   const [status, setStatus] = useState<NetworkStatus>("Init");
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [clientUrl, setClientUrl] = useState<string>(localStorage.getItem("clientUrl") || "http://localhost:7373");
-  const [serverUrl, setServerUrl] = useState<string>(localStorage.getItem("serverUrl") || "http://127.0.0.1:8080");
-  const [pollingInterval, setPollingInterval] = useState<number>(Number(localStorage.getItem("pollingInterval")) || 5000);
+  const [clientUrl, setClientUrl] = useState<string>(
+    localStorage.getItem("clientUrl") || "http://localhost:7373"
+  );
+  const [serverUrl, setServerUrl] = useState<string>(
+    localStorage.getItem("serverUrl") || "http://127.0.0.1:8080"
+  );
+  const [pollingInterval, setPollingInterval] = useState<number>(
+    Number(localStorage.getItem("pollingInterval")) || 5000
+  );
 
+  // Persistenza su localStorage
   useEffect(() => {
     localStorage.setItem("clientUrl", clientUrl);
   }, [clientUrl]);
@@ -60,6 +66,7 @@ export const SimulationProvider = ({ children }: { children: React.ReactNode }) 
     localStorage.setItem("pollingInterval", pollingInterval.toString());
   }, [pollingInterval]);
 
+  // Recupera lo status iniziale dal backend
   useEffect(() => {
     const fetchStatus = async () => {
       try {
@@ -73,9 +80,10 @@ export const SimulationProvider = ({ children }: { children: React.ReactNode }) 
       }
     };
 
-    fetchStatus().then(r => r);
+    fetchStatus();
   }, []);
 
+  // Ascolta gli eventi di aggiornamento dello status
   useEffect(() => {
     const unlistenPromise = listen<string>("simulation_status_changed", (event) => {
       console.log(`Network status updated: ${ event.payload }`);
@@ -87,30 +95,53 @@ export const SimulationProvider = ({ children }: { children: React.ReactNode }) 
     };
   }, []);
 
+
+  function extractErrorMessage(error: unknown): string {
+    if (typeof error === "string") {
+      return error;
+    }
+    if (error instanceof Error) {
+      return error.message;
+    }
+    if (typeof error === "object" && error !== null) {
+      return (error as any).message || JSON.stringify(error);
+    }
+    return "Unknown error";
+  }
+
   const startNetwork = async () => {
     try {
-      await invoke("start_simulation");
+      await invoke<void>("start_simulation");
       toast.success("Simulation started! Configuration saved to history.");
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error starting the network:", error);
-      toast.error("Failed to start simulation.");
+      const errorMessage = extractErrorMessage(error);
+      toast.error(`Failed to start simulation: ${ errorMessage }`);
     }
   };
 
+  // Ferma la simulazione
   const stopNetwork = async () => {
     try {
-      await invoke("stop_simulation");
-    } catch (error) {
+      await invoke<void>("stop_simulation");
+      toast.success("Simulation stopped successfully.");
+    } catch (error: unknown) {
       console.error("Error stopping the network:", error);
+      const errorMessage = extractErrorMessage(error);
+      toast.error(`Failed to stop simulation: ${ errorMessage }`);
     }
   };
 
+  // Riavvia la simulazione
   const restartNetwork = async () => {
     try {
-      await invoke("stop_simulation");
-      await invoke("start_simulation");
-    } catch (error) {
+      await invoke<void>("stop_simulation");
+      await invoke<void>("start_simulation");
+      toast.success("Simulation restarted successfully.");
+    } catch (error: unknown) {
       console.error("Error restarting the network:", error);
+      const errorMessage = extractErrorMessage(error);
+      toast.error(`Failed to restart simulation: ${ errorMessage }`);
     }
   };
 

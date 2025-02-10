@@ -38,7 +38,7 @@ server = { git = "https://github.com/Rustbusters/server.git" }
 common-utils = { git = "https://github.com/Rustbusters/common-utils.git" }
 
 # DRONES
-rustbusters-drone = { git = "ssh://github.com/Rustbusters/drone.git" } # TODO: remove Rustbusters drone
+rustbusters-drone = { git = "ssh://github.com/Rustbusters/drone.git" }
 rusty_drones = { git = "https://github.com/rusty-drone-2024/rusty-drone" }
 lockheedrustin-drone = { git = "https://github.com/Lockheed-Rustin/drone.git" }
 fungi_drone = { git = "https://github.com/Fungi-B-D/Fungi-Drone.git" }

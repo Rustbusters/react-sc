@@ -6,6 +6,7 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use tauri::State;
 use wg_2024::network::NodeId;
+use wg_2024::packet::NodeType;
 
 #[tauri::command]
 pub fn remove_node(
@@ -59,28 +60,42 @@ pub fn remove_edge(
     Ok(())
 }
 
-// TODO: sistemare questo
-/*#[tauri::command]
-pub fn add_drone(
+#[tauri::command]
+pub fn add_node(
     state: State<Arc<Mutex<SimulationState>>>,
-    node1_id: NodeId,
-    connected_node_ids: Vec<NodeId>,
-    pdr: u32,
+    neighbors: Vec<NodeId>,
+    pdr: Option<u32>,
+    node_type: String, // Drone, Client, Server
 ) -> Result<(), NetworkError> {
     let mut sim_state = state.lock();
+    
+    let node_type = match node_type.as_str() {
+        "Drone" => NodeType::Drone,
+        "Client" => NodeType::Client,
+        "Server" => NodeType::Server,
+        _ => return Err(NetworkError::InvalidNodeType(node_type)),
+    };
 
     if sim_state.get_status() == SimulationStatus::Running {
-        crate::simulation::controller::add_edge(&mut sim_state, node1_id, node2_id)?;
+        if node_type == NodeType::Drone {
+            let pdr = pdr.ok_or(NetworkError::InvalidPdr(0))?;
+            crate::simulation::controller::add_drone(&mut sim_state, neighbors, pdr)?;
+        } else {
+            return Err(NetworkError::InvalidOperation(
+                "Cannot add a client or server node during the simulation".to_string(),
+            ));
+        }
     } else {
         crate::simulation::configs::configs_handler::add_node_to_config(
             &mut sim_state,
-            node1_id,
-            NodeMetadata::Drone(DroneMetadata::new(None, (pdr as f32) / 100.0)),
+            node_type,
+            neighbors,
+            pdr,
         )?;
     }
 
     Ok(())
-}*/
+}
 
 #[tauri::command]
 pub fn add_edge(

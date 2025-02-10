@@ -1,15 +1,15 @@
 use crate::commands::config::get_history_dir;
 use crate::error::NetworkError;
 use crate::simulation::state::SimulationState;
-use crate::simulation::topology::NodeMetadata;
 use chrono::Utc;
 use log::info;
 use std::fs;
 use std::path::PathBuf;
 use tauri::path::BaseDirectory;
 use tauri::{AppHandle, Manager};
-use wg_2024::config::Config;
+use wg_2024::config::{Client, Config, Drone, Server};
 use wg_2024::network::NodeId;
+use wg_2024::packet::NodeType;
 
 pub fn get_default_configs_dir(app_handle: AppHandle) -> Result<PathBuf, NetworkError> {
     app_handle
@@ -112,35 +112,66 @@ pub fn remove_edge_from_config(
     Ok(())
 }
 
-// TODO: fix this
 pub fn add_node_to_config(
     state: &mut SimulationState,
-    node_id: NodeId,
-    node_type: NodeMetadata,
+    node_type: NodeType,
+    neighbors: Vec<NodeId>,
+    pdr: Option<u32>,
 ) -> Result<(), NetworkError> {
     let config = state.get_config_mut().ok_or(NetworkError::NoConfigLoaded)?;
 
-    /*match node_type {
-        NodeMetadata::Drone => {
-            config.drone.push(SerializableDrone {
+    // find first available node id (that is not any client, server or drone)
+    let mut node_id = 1;
+    while config.client.iter().any(|c| c.id == node_id)
+        || config.server.iter().any(|s| s.id == node_id)
+        || config.drone.iter().any(|d| d.id == node_id)
+    {
+        node_id += 1;
+    }
+
+    match node_type {
+        NodeType::Client => {
+            let client = Client {
                 id: node_id,
-                connected_node_ids: vec![],
-                pdr: 1.0,
-            });
+                connected_drone_ids: neighbors.clone(),
+            };
+            config.client.push(client);
         }
-        NodeMetadata::Client => {
-            config.client.push(SerializableClient {
+        NodeType::Drone => {
+            let drone = Drone {
                 id: node_id,
-                connected_drone_ids: vec![],
-            });
+                connected_node_ids: neighbors.clone(),
+                pdr: pdr.ok_or(NetworkError::InvalidPdr(0))? as f32 / 100.0,
+            };
+            config.drone.push(drone);
         }
-        NodeMetadata::Server => {
-            config.server.push(SerializableServer {
+        NodeType::Server => {
+            let server = Server {
                 id: node_id,
-                connected_drone_ids: vec![],
-            });
+                connected_drone_ids: neighbors.clone(),
+            };
+            config.server.push(server);
         }
-    }*/
+    }
+
+    // Add the node to the list of neighbors of the other nodes
+    for neighbor_id in neighbors {
+        for drone in &mut config.drone {
+            if drone.id == neighbor_id {
+                drone.connected_node_ids.push(node_id);
+            }
+        }
+        for client in &mut config.client {
+            if client.id == neighbor_id {
+                client.connected_drone_ids.push(node_id);
+            }
+        }
+        for server in &mut config.server {
+            if server.id == neighbor_id {
+                server.connected_drone_ids.push(node_id);
+            }
+        }
+    }
 
     Ok(())
 }

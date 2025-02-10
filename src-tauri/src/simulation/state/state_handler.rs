@@ -194,6 +194,7 @@ impl SimulationState {
         let config = self.initial_config.as_ref().unwrap();
 
         // Build the graph
+        self.graph = Default::default();
         self.graph.build_graph(config);
 
         // Validate the graph
@@ -212,7 +213,7 @@ impl SimulationState {
 
         for (&node_id, neighbors) in &self.graph.adjacency.clone() {
             for &neighbor_id in neighbors {
-                send_remove_sender_command(&self, node_id, neighbor_id)?;
+                send_remove_sender_command(self, node_id, neighbor_id)?;
             }
         }
 

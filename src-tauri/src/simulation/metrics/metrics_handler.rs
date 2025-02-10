@@ -40,8 +40,7 @@ impl Metrics {
     }
 
     /// Update the metrics for a packet dropped by a drone.
-    pub fn update_drone_packet_dropped(&mut self, node_id: NodeId, packet: &Packet) {
-        let packet_type = PacketTypeLabel::from(&packet.pack_type);
+    pub fn update_drone_packet_dropped(&mut self, node_id: NodeId, _packet: &Packet) {
         if let Some(drone_metrics) = self.drone_metrics.get_mut(&node_id) {
             drone_metrics.drops += 1;
             drone_metrics.update_pdr(false);

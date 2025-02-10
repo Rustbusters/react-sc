@@ -74,7 +74,7 @@ pub fn run() {
             // topology
             crate::commands::topology::remove_node,
             crate::commands::topology::remove_edge,
-            // fix add_drone
+            crate::commands::topology::add_node,
             crate::commands::topology::add_edge,
             crate::commands::topology::get_graph, // da finire il refactoring
             crate::commands::topology::get_network_nodes, // da finire il refactoring

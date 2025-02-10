@@ -52,7 +52,7 @@ pub fn stop_simulation(
 
     if sim_state.get_status() != SimulationStatus::Running {
         info!("Simulation is already stopped");
-        return Ok(());
+        return Err(NetworkError::NetworkNotRunning);
     }
 
     info!("Stopping the simulation...");

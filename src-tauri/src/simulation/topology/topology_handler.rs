@@ -164,4 +164,45 @@ impl GraphState {
 
         Ok(())
     }
+
+    pub fn add_drone(
+        &mut self,
+        node_id: NodeId,
+        connected_node_ids: Vec<NodeId>,
+        pdr: u32,
+    ) -> Result<(), NetworkError> {
+        if self.node_info.contains_key(&node_id) {
+            return Err(NetworkError::InvalidOperation(format!(
+                "Node {} already exists",
+                node_id
+            )));
+        }
+
+        self.adjacency
+            .entry(node_id)
+            .or_default()
+            .extend(connected_node_ids.clone());
+
+        for &nbr in &connected_node_ids {
+            self.adjacency.entry(nbr).or_default().push(node_id);
+        }
+
+        self.node_info.insert(
+            node_id,
+            NodeMetadata::Drone(DroneMetadata {
+                node_group: None,
+                pdr: (pdr as f32) / 100.0,
+            }),
+        );
+
+        Ok(())
+    }
+
+    pub fn get_next_node_id(&self) -> NodeId {
+        let how_many = self.node_info.len() as NodeId;
+        (1..)
+            .find(|id| !self.node_info.contains_key(&(*id + how_many)))
+            .unwrap()
+            + how_many
+    }
 }

@@ -60,6 +60,9 @@ pub enum NetworkError {
 
     #[error("Path error: {0}")]
     PathError(String),
+
+    #[error("Invalid node type: {0}")]
+    InvalidNodeType(String),
 }
 
 impl Serialize for NetworkError {

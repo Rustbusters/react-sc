@@ -98,13 +98,33 @@ pub fn add_edge(
     validate_graph(&new_graph, state.get_strict_mode())?;
 
     crate::simulation::controller::controller_commands::send_add_sender_command(
-        &state, node1_id, node2_id,
+        state, node1_id, node2_id,
     )?;
     crate::simulation::controller::controller_commands::send_add_sender_command(
-        &state, node2_id, node1_id,
+        state, node2_id, node1_id,
     )?;
 
     state.set_graph(new_graph);
+
+    Ok(())
+}
+
+pub fn add_drone(
+    state: &mut SimulationState,
+    neighbors: Vec<NodeId>,
+    pdr: u32,
+) -> Result<(), NetworkError> {
+    let mut new_graph = state.get_graph().clone();
+    let node_id = new_graph.get_next_node_id();
+    new_graph.add_drone(node_id, neighbors.clone(), pdr)?;
+
+    validate_graph(&new_graph, state.get_strict_mode())?;
+
+    state.set_graph(new_graph);
+
+    crate::simulation::initializer::network_initializer::create_new_drone(
+        state, node_id, neighbors, pdr,
+    )?;
 
     Ok(())
 }

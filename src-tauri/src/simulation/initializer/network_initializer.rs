@@ -381,7 +381,7 @@ pub fn create_new_drone(
     state: &mut SimulationState,
     drone_id: NodeId,
     connected_node_ids: Vec<NodeId>,
-    pdr: f32,
+    pdr: u32,
 ) -> Result<NodeId, NetworkError> {
     let (cmd_tx, cmd_rx) = unbounded::<DroneCommand>();
     let (evt_tx, evt_rx) = unbounded::<DroneEvent>();
@@ -394,6 +394,10 @@ pub fn create_new_drone(
     state
         .get_inter_node_channels_mut()
         .insert(drone_id, (packet_sender.clone(), packet_receiver.clone()));
+
+    state
+        .get_metrics_mut()
+        .insert_node(drone_id, wg_2024::packet::NodeType::Drone);
 
     let mut packet_send = HashMap::new();
     for &neighbor_id in &connected_node_ids {
@@ -425,7 +429,7 @@ pub fn create_new_drone(
         drone_factories
             .choose(&mut rng)
             .ok_or(NetworkError::ValidationError(
-                "Nessuna factory disponibile".into(),
+                "No drone factories available".to_string(),
             ))?;
 
     let new_drone = selected_factory(
@@ -434,26 +438,21 @@ pub fn create_new_drone(
         cmd_rx.clone(),
         packet_receiver,
         packet_send,
-        pdr,
+        pdr as f32 / 100.0,
     );
 
     state
         .get_graph_mut()
         .set_drone_group(drone_id, new_drone.drone_type().to_string());
 
-    /*for &neighbor_id in &connected_node_ids {
-        // TODO: fix from here
-        let neighbor_type = state
-            .get_graph()
-            .node_info
-            .get(&neighbor_id)
-            .ok_or(NetworkError::NodeNotFound(neighbor_id.to_string()))?
-            .node_type
-            .clone();
-
-        state.send_add_sender_command(neighbor_id, &neighbor_type, drone_id)?;
-    } */
-    // TODO: to here
+    // call send_add_sender_command on each neighbor
+    for neighbor_id in &connected_node_ids {
+        crate::simulation::controller::controller_commands::send_add_sender_command(
+            state,
+            drone_id,
+            *neighbor_id,
+        )?;
+    }
 
     let handle = std::thread::spawn(move || {
         let mut d = new_drone;
