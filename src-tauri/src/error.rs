@@ -4,6 +4,9 @@ use wg_2024::network::NodeId;
 
 #[derive(Error, Debug)]
 pub enum NetworkError {
+    #[error("Failed to delete configuration file: {0}")]
+    ConfigFileDeleteError(std::io::Error),
+
     #[error("Failed to read configuration file: {0}")]
     ConfigFileReadError(#[from] std::io::Error),
 
@@ -21,6 +24,15 @@ pub enum NetworkError {
 
     #[error("The selected node does not exist: {0}")]
     NodeNotFound(String),
+
+    #[error("The selected edge does not exist: {0} - {1}")]
+    EdgeNotFound(NodeId, NodeId),
+
+    #[error("The selected edge already exists: {0} - {1}")]
+    EdgeAlreadyExists(NodeId, NodeId),
+
+    #[error("The selected drone is not a drone: {0}")]
+    NodeIsNotDrone(NodeId),
 
     #[error("Invalid Packet Drop Rate value: {0}")]
     InvalidPdr(u8),
@@ -42,6 +54,9 @@ pub enum NetworkError {
 
     #[error("Generic error: {0}")]
     Other(String),
+
+    #[error("Thread join error: {0}")]
+    ThreadJoinError(String),
 
     #[error("Path error: {0}")]
     PathError(String),

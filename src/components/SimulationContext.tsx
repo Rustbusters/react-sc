@@ -64,7 +64,7 @@ export const SimulationProvider = ({ children }: { children: React.ReactNode }) 
     const fetchStatus = async () => {
       try {
         setIsLoading(true);
-        const response = await invoke<NetworkStatus>("get_network_status");
+        const response = await invoke<NetworkStatus>("get_simulation_status");
         setStatus(response);
       } catch (error) {
         console.error("Error retrieving network status:", error);
@@ -77,7 +77,7 @@ export const SimulationProvider = ({ children }: { children: React.ReactNode }) 
   }, []);
 
   useEffect(() => {
-    const unlistenPromise = listen<string>("network_status_changed", (event) => {
+    const unlistenPromise = listen<string>("simulation_status_changed", (event) => {
       console.log(`Network status updated: ${ event.payload }`);
       setStatus(event.payload as NetworkStatus);
     });
@@ -89,7 +89,7 @@ export const SimulationProvider = ({ children }: { children: React.ReactNode }) 
 
   const startNetwork = async () => {
     try {
-      await invoke("start_network");
+      await invoke("start_simulation");
       toast.success("Simulation started! Configuration saved to history.");
     } catch (error) {
       console.error("Error starting the network:", error);
@@ -99,7 +99,7 @@ export const SimulationProvider = ({ children }: { children: React.ReactNode }) 
 
   const stopNetwork = async () => {
     try {
-      await invoke("stop_network");
+      await invoke("stop_simulation");
     } catch (error) {
       console.error("Error stopping the network:", error);
     }
@@ -107,8 +107,8 @@ export const SimulationProvider = ({ children }: { children: React.ReactNode }) 
 
   const restartNetwork = async () => {
     try {
-      await invoke("stop_network");
-      await invoke("start_network");
+      await invoke("stop_simulation");
+      await invoke("start_simulation");
     } catch (error) {
       console.error("Error restarting the network:", error);
     }

@@ -1,17 +1,13 @@
+use crate::drone_factories;
 use crate::error::NetworkError;
-use crate::network::state::NetworkState;
-use ap2024_unitn_cppenjoyers_drone::CppEnjoyersDrone;
+use crate::simulation::initializer::factory::{DroneFactory, DroneRunnable};
+use crate::simulation::state::{SimulationState, SimulationStatus};
 use client::RustbustersClient;
 use common_utils::{HostCommand, HostEvent};
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use fungi_drone::FungiDrone;
-use lockheedrustin_drone::LockheedRustin;
 use log::info;
-use rust_do_it::RustDoIt;
-use rust_roveri::RustRoveri;
-use rustastic_drone::RustasticDrone;
-use rusteze_drone::RustezeDrone;
-use rusty_drones::RustyDrone;
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 use server::utils::traits::Runnable;
 use server::{RustBustersServer, RustBustersServerController};
 use std::collections::HashMap;
@@ -20,100 +16,84 @@ use std::{env, thread};
 use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::drone::Drone;
 use wg_2024::network::NodeId;
-use wg_2024::packet::Packet;
-use wg_2024_rust::drone::RustDrone;
-use RF_drone::RustAndFurious;
 
-/// A trait representing a generic drone implementation
-/// that can be 'run' in its own thread. Because you call
-/// `thread::spawn(move || { ... })`, this trait must be `Send` if
-/// you want to move the drone object across threads.
-pub trait DroneRunnable: Send {
-    fn run(&mut self);
-    fn drone_type(&self) -> &'static str;
+pub fn initialize_network(state: &mut SimulationState) -> Result<(), NetworkError> {
+    info!("Initializing network...");
+
+    init_inter_node_channels(state)?;
+    initialize_drones(state)?;
+    initialize_clients(state)?;
+    initialize_servers(state)?;
+
+    state.set_status(SimulationStatus::Running);
+
+    Ok(())
 }
 
-/// Blanket impl: any `T` that implements `wg_2024::drone::Drone + Send`
-/// automatically implements `DroneRunnable`.
-impl<T: Drone + Send> DroneRunnable for T {
-    fn run(&mut self) {
-        <Self as Drone>::run(self);
+pub fn init_inter_node_channels(state: &mut SimulationState) -> Result<(), NetworkError> {
+    state.set_inter_node_channels(HashMap::new());
+
+    let config = state
+        .get_config()
+        .ok_or(NetworkError::NoConfigLoaded)?
+        .clone();
+
+    for drone in &config.drone {
+        let (sender, receiver) = unbounded();
+        state
+            .get_inter_node_channels_mut()
+            .insert(drone.id, (sender, receiver));
+        // state.metrics.insert_node(drone.id, NodeType::Drone); // TODO
+        state
+            .get_metrics_mut()
+            .insert_node(drone.id, wg_2024::packet::NodeType::Drone);
+    }
+    for client in &config.client {
+        let (sender, receiver) = unbounded();
+        state
+            .get_inter_node_channels_mut()
+            .insert(client.id, (sender, receiver));
+        // state.metrics.insert_node(client.id, NodeType::Client); // TODO
+        state
+            .get_metrics_mut()
+            .insert_node(client.id, wg_2024::packet::NodeType::Client);
+    }
+    for server in &config.server {
+        let (sender, receiver) = unbounded();
+        state
+            .get_inter_node_channels_mut()
+            .insert(server.id, (sender, receiver));
+        // state.metrics.insert_node(server.id, NodeType::Server); // TODO
+        state
+            .get_metrics_mut()
+            .insert_node(server.id, wg_2024::packet::NodeType::Server);
     }
 
-    /// Returns the type name of the drone implementation.
-    fn drone_type(&self) -> &'static str {
-        std::any::type_name::<T>()
-            .split("::")
-            .last()
-            .unwrap_or("Unknown")
-    }
+    Ok(())
 }
 
-/// Type alias for a factory function that produces a `Box<dyn DroneRunnable + Send>`.
-pub type DroneFactory = Box<
-    dyn Fn(
-            NodeId,
-            // The drone sends events back via this Sender<DroneEvent>
-            Sender<DroneEvent>,
-            // The drone receives commands from this Receiver<DroneCommand>
-            crossbeam_channel::Receiver<DroneCommand>,
-            // The drone receives incoming Packets
-            crossbeam_channel::Receiver<Packet>,
-            // A map of neighbor_id -> Sender<Packet>, used to send packets out
-            HashMap<NodeId, Sender<Packet>>,
-            // The PDR for this drone
-            f32,
-        ) -> Box<dyn DroneRunnable + Send>
-        + Send
-        + Sync,
->;
-
-/// Macro that produces a vector of factory closures.
-/// Each closure can instantiate a specific drone type that implements
-/// `Drone + Send`.
-#[macro_export]
-macro_rules! drone_factories {
-    ($($type_name:ty),* $(,)?) => {{
-        vec![
-            $(
-                Box::new(
-                    |id, evt_tx, cmd_rx, pkt_rx, pkt_send, pdr| -> Box<dyn DroneRunnable + Send> {
-                        // Create an instance of <$type_name>, which must implement
-                        // `wg_2024::drone::Drone + Send`.
-                        // Because of the blanket impl, it automatically works as `DroneRunnable + Send`.
-                        Box::new(<$type_name>::new(id, evt_tx, cmd_rx, pkt_rx, pkt_send, pdr))
-                    }
-                ) as DroneFactory
-            ),*
-        ]
-    }};
-}
-
-/// Initializes drones based on the drone list in `state.initial_config`.
-/// By default, it uses the `RustyDrone` factory, but you can adapt this
-/// to select different drone types based on config fields.
-pub fn initialize_drones(state: &mut NetworkState) -> Result<(), NetworkError> {
+pub fn initialize_drones(state: &mut SimulationState) -> Result<(), NetworkError> {
     // Example: build an array with just one drone factory for demonstration
     // Ensure `RustyDrone` is actually `Send`.
     let drone_factories: Vec<DroneFactory> = drone_factories![
-        // RustBustersDrone,
-        RustyDrone,
-        LockheedRustin,
-        FungiDrone,
-        RustasticDrone,
-        RustezeDrone,
-        RustDoIt,
-        RustRoveri,
-        RustAndFurious,
-        CppEnjoyersDrone,
-        RustDrone,
+        // rustbusters_drone::RustBustersDrone, // Non aspetta la chiusura del commands
+        rusty_drones::RustyDrone,
+        lockheedrustin_drone::LockheedRustin,
+        fungi_drone::FungiDrone,
+        rustastic_drone::RustasticDrone, // Come noi
+        rusteze_drone::RustezeDrone,
+        rust_do_it::RustDoIt,     // Come noi
+        rust_roveri::RustRoveri,  // Come noi
+        RF_drone::RustAndFurious, // Come noi
+        ap2024_unitn_cppenjoyers_drone::CppEnjoyersDrone,
+        wg_2024_rust::drone::RustDrone,
     ];
     let mut factory_index = 0;
 
     let config = state
-        .initial_config
-        .as_ref()
-        .ok_or(NetworkError::NoConfigLoaded)?;
+        .get_config()
+        .ok_or(NetworkError::NoConfigLoaded)?
+        .clone();
 
     for drone in &config.drone {
         // 1) Create a channel for commands (controller -> drone)
@@ -124,12 +104,12 @@ pub fn initialize_drones(state: &mut NetworkState) -> Result<(), NetworkError> {
         // Store (Sender<DroneCommand>, Receiver<DroneEvent>) so the controller can
         // send commands and receive events from this drone
         state
-            .drones_controller_channels
+            .get_drone_controller_channels_mut()
             .insert(drone.id, (cmd_tx.clone(), evt_rx));
 
         // Ensure we have inter_node_channels for this drone
         state
-            .inter_node_channels
+            .get_inter_node_channels_mut()
             .entry(drone.id)
             .or_insert_with(|| {
                 let (packet_sender, packet_receiver) = unbounded();
@@ -138,7 +118,7 @@ pub fn initialize_drones(state: &mut NetworkState) -> Result<(), NetworkError> {
 
         // The drone's Packet receiver
         let packet_recv = state
-            .inter_node_channels
+            .get_inter_node_channels()
             .get(&drone.id)
             .ok_or(NetworkError::ChannelNotFound(drone.id))?
             .1
@@ -148,7 +128,7 @@ pub fn initialize_drones(state: &mut NetworkState) -> Result<(), NetworkError> {
         let mut packet_send = HashMap::new();
         for &neighbor_id in &drone.connected_node_ids {
             state
-                .inter_node_channels
+                .get_inter_node_channels_mut()
                 .entry(neighbor_id)
                 .or_insert_with(|| {
                     let (tx, rx) = unbounded();
@@ -156,7 +136,7 @@ pub fn initialize_drones(state: &mut NetworkState) -> Result<(), NetworkError> {
                 });
 
             let neighbor_sender = state
-                .inter_node_channels
+                .get_inter_node_channels()
                 .get(&neighbor_id)
                 .ok_or(NetworkError::ChannelNotFound(neighbor_id))?
                 .0
@@ -165,7 +145,6 @@ pub fn initialize_drones(state: &mut NetworkState) -> Result<(), NetworkError> {
             packet_send.insert(neighbor_id, neighbor_sender);
         }
 
-        // Pick a drone factory. In a real scenario, match a config field if needed.
         let create_drone = &drone_factories[factory_index];
         factory_index = (factory_index + 1) % drone_factories.len();
 
@@ -179,12 +158,8 @@ pub fn initialize_drones(state: &mut NetworkState) -> Result<(), NetworkError> {
         );
 
         state
-            .graph
-            .node_info
-            .entry(drone.id)
-            .and_modify(|node_info| {
-                node_info.node_group = Some(new_drone.drone_type().to_string());
-            });
+            .get_graph_mut()
+            .set_drone_group(drone.id, new_drone.drone_type().to_string());
 
         // Now we can spawn the drone in a new thread
         // because `Box<dyn DroneRunnable + Send>` is `Send`.
@@ -194,19 +169,18 @@ pub fn initialize_drones(state: &mut NetworkState) -> Result<(), NetworkError> {
         });
 
         // Store the thread handle
-        state.node_threads.insert(drone.id, handle);
+        state.get_nodes_threads_mut().insert(drone.id, handle);
     }
 
     Ok(())
 }
 
 /// Initializes clients based on the client list in `state.initial_config`.
-/// The logic remains unchanged except we fix NodeId imports.
-pub fn initialize_clients(state: &mut NetworkState) -> Result<(), NetworkError> {
+pub fn initialize_clients(state: &mut SimulationState) -> Result<(), NetworkError> {
     let config = state
-        .initial_config
-        .as_ref()
-        .ok_or(NetworkError::NoConfigLoaded)?;
+        .get_config()
+        .ok_or(NetworkError::NoConfigLoaded)?
+        .clone();
 
     for client in &config.client {
         // 1) Create a channel for commands (controller -> client)
@@ -214,14 +188,13 @@ pub fn initialize_clients(state: &mut NetworkState) -> Result<(), NetworkError> 
         // 2) Create a channel for events (client -> controller)
         let (evt_tx, evt_rx) = unbounded::<common_utils::HostEvent>();
 
-        // Store in state so we can send commands to the client, read events from it
         state
-            .client_controller_channels
+            .get_client_controller_channels_mut()
             .insert(client.id, (cmd_tx.clone(), evt_rx));
 
         // Ensure inter_node_channels for this client
         state
-            .inter_node_channels
+            .get_inter_node_channels_mut()
             .entry(client.id)
             .or_insert_with(|| {
                 let (packet_sender, packet_receiver) = unbounded();
@@ -229,7 +202,7 @@ pub fn initialize_clients(state: &mut NetworkState) -> Result<(), NetworkError> 
             });
 
         let packet_recv = state
-            .inter_node_channels
+            .get_inter_node_channels()
             .get(&client.id)
             .ok_or(NetworkError::ChannelNotFound(client.id))?
             .1
@@ -239,14 +212,14 @@ pub fn initialize_clients(state: &mut NetworkState) -> Result<(), NetworkError> 
         let mut packet_send = HashMap::new();
         for &neighbor_id in &client.connected_drone_ids {
             state
-                .inter_node_channels
+                .get_inter_node_channels_mut()
                 .entry(neighbor_id)
                 .or_insert_with(|| {
                     let (tx, rx) = unbounded();
                     (tx, rx)
                 });
             let neighbor_sender = state
-                .inter_node_channels
+                .get_inter_node_channels()
                 .get(&neighbor_id)
                 .ok_or(NetworkError::ChannelNotFound(neighbor_id))?
                 .0
@@ -255,7 +228,7 @@ pub fn initialize_clients(state: &mut NetworkState) -> Result<(), NetworkError> 
         }
 
         let client_clone = client.clone();
-        let discovery_interval = state.discovery_interval;
+        let discovery_interval = state.get_discovery_interval();
         let handle = thread::spawn(move || {
             let mut client_host = RustbustersClient::new(
                 client_clone.id,
@@ -268,19 +241,18 @@ pub fn initialize_clients(state: &mut NetworkState) -> Result<(), NetworkError> 
             client_host.run();
         });
 
-        state.node_threads.insert(client.id, handle);
+        state.get_nodes_threads_mut().insert(client.id, handle);
     }
 
     Ok(())
 }
 
 /// Initializes servers based on the server list in `state.initial_config`.
-/// Very similar to clients, but using server_controller_channels.
-pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> {
+pub fn initialize_servers(state: &mut SimulationState) -> Result<(), NetworkError> {
     let config = state
-        .initial_config
-        .as_ref()
-        .ok_or(NetworkError::NoConfigLoaded)?;
+        .get_config()
+        .ok_or(NetworkError::NoConfigLoaded)?
+        .clone();
 
     let (
         http_server_address,
@@ -302,11 +274,11 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
         let (evt_tx, evt_rx) = unbounded::<HostEvent>();
 
         state
-            .server_controller_channels
+            .get_server_controller_channels_mut()
             .insert(server.id, (cmd_tx.clone(), evt_rx));
 
         state
-            .inter_node_channels
+            .get_inter_node_channels_mut()
             .entry(server.id)
             .or_insert_with(|| {
                 let (packet_sender, packet_receiver) = unbounded();
@@ -314,7 +286,7 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
             });
 
         let packet_recv = state
-            .inter_node_channels
+            .get_inter_node_channels()
             .get(&server.id)
             .ok_or(NetworkError::ChannelNotFound(server.id))?
             .1
@@ -323,14 +295,14 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
         let mut packet_send = HashMap::new();
         for &neighbor_id in &server.connected_drone_ids {
             state
-                .inter_node_channels
+                .get_inter_node_channels_mut()
                 .entry(neighbor_id)
                 .or_insert_with(|| {
                     let (tx, rx) = unbounded();
                     (tx, rx)
                 });
             let neighbor_sender = state
-                .inter_node_channels
+                .get_inter_node_channels()
                 .get(&neighbor_id)
                 .ok_or(NetworkError::ChannelNotFound(neighbor_id))?
                 .0
@@ -340,8 +312,8 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
 
         let server_clone = server.clone();
 
-        let discovery_interval = state.discovery_interval;
-        let server_istance = RustBustersServer::new(
+        let discovery_interval = state.get_discovery_interval();
+        let server_instance = RustBustersServer::new(
             server_clone.id,
             evt_tx,
             cmd_rx,
@@ -351,9 +323,9 @@ pub fn initialize_servers(state: &mut NetworkState) -> Result<(), NetworkError> 
             discovery_interval,
         );
 
-        let handle = server_istance.run().unwrap();
+        let handle = server_instance.run().unwrap();
 
-        state.node_threads.insert(server.id, handle);
+        state.get_nodes_threads_mut().insert(server.id, handle);
     }
 
     Ok(())
@@ -404,12 +376,9 @@ fn config_server_controller() -> (
     )
 }
 
-use rand::seq::SliceRandom;
-use rand::thread_rng;
-
 /// Creates a new drone with the given connected neighbors and PDR.
 pub fn create_new_drone(
-    state: &mut NetworkState,
+    state: &mut SimulationState,
     drone_id: NodeId,
     connected_node_ids: Vec<NodeId>,
     pdr: f32,
@@ -418,18 +387,18 @@ pub fn create_new_drone(
     let (evt_tx, evt_rx) = unbounded::<DroneEvent>();
 
     state
-        .drones_controller_channels
+        .get_drone_controller_channels_mut()
         .insert(drone_id, (cmd_tx.clone(), evt_rx));
 
     let (packet_sender, packet_receiver) = unbounded();
     state
-        .inter_node_channels
+        .get_inter_node_channels_mut()
         .insert(drone_id, (packet_sender.clone(), packet_receiver.clone()));
 
     let mut packet_send = HashMap::new();
     for &neighbor_id in &connected_node_ids {
         let neighbor_sender = state
-            .inter_node_channels
+            .get_inter_node_channels()
             .get(&neighbor_id)
             .ok_or(NetworkError::ChannelNotFound(neighbor_id))?
             .0
@@ -439,16 +408,16 @@ pub fn create_new_drone(
     }
 
     let drone_factories: Vec<DroneFactory> = drone_factories![
-        RustyDrone,
-        LockheedRustin,
-        FungiDrone,
-        RustasticDrone,
-        RustezeDrone,
-        RustDoIt,
-        RustRoveri,
-        RustAndFurious,
-        CppEnjoyersDrone,
-        RustDrone,
+        rusty_drones::RustyDrone,
+        lockheedrustin_drone::LockheedRustin,
+        fungi_drone::FungiDrone,
+        rustastic_drone::RustasticDrone,
+        rusteze_drone::RustezeDrone,
+        rust_do_it::RustDoIt,
+        rust_roveri::RustRoveri,
+        RF_drone::RustAndFurious,
+        ap2024_unitn_cppenjoyers_drone::CppEnjoyersDrone,
+        wg_2024_rust::drone::RustDrone,
     ];
 
     let mut rng = thread_rng();
@@ -468,13 +437,14 @@ pub fn create_new_drone(
         pdr,
     );
 
-    if let Some(node_metadata) = state.graph.node_info.get_mut(&drone_id) {
-        node_metadata.node_group = Some(new_drone.drone_type().to_string());
-    }
+    state
+        .get_graph_mut()
+        .set_drone_group(drone_id, new_drone.drone_type().to_string());
 
-    for &neighbor_id in &connected_node_ids {
+    /*for &neighbor_id in &connected_node_ids {
+        // TODO: fix from here
         let neighbor_type = state
-            .graph
+            .get_graph()
             .node_info
             .get(&neighbor_id)
             .ok_or(NetworkError::NodeNotFound(neighbor_id.to_string()))?
@@ -482,14 +452,15 @@ pub fn create_new_drone(
             .clone();
 
         state.send_add_sender_command(neighbor_id, &neighbor_type, drone_id)?;
-    }
-    
+    } */
+    // TODO: to here
+
     let handle = std::thread::spawn(move || {
         let mut d = new_drone;
         d.run();
     });
-    
-    state.node_threads.insert(drone_id, handle);
+
+    state.get_nodes_threads_mut().insert(drone_id, handle);
 
     Ok(drone_id)
 }

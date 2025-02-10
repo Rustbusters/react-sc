@@ -1,22 +1,10 @@
-mod commands;
+pub mod commands;
 mod error;
-mod listener;
-mod network;
+pub mod simulation;
 mod utils;
 
-use crate::commands::{
-    add_drone, add_neighbor, config_remove_edge, config_remove_node, crash_command,
-    delete_history_config, get_default_configs,
-    get_discovery_interval, get_drone_metrics,
-    get_graph, get_history_configs, get_history_dir, get_host_metrics,
-    get_network_infos, get_network_nodes, get_network_status, get_new_messages,
-    get_node_info, get_overview_metrics, get_strict_mode, load_config, remove_neighbor,
-    send_packet, send_set_pdr_command, set_discovery_interval, set_strict_mode, start_network,
-    start_repeated_sending, stop_network, stop_repeated_sending,
-};
-use crate::listener::Listener;
-use crate::network::state::NetworkState;
-
+use crate::simulation::listener::Listener;
+use crate::simulation::state::SimulationState;
 use dotenv::dotenv;
 use parking_lot::Mutex;
 use std::sync::atomic::AtomicBool;
@@ -25,7 +13,7 @@ use std::sync::Arc;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     dotenv().ok();
-    let state = Arc::new(Mutex::new(NetworkState::new()));
+    let state = Arc::new(Mutex::new(SimulationState::new()));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_deep_link::init())
@@ -52,7 +40,7 @@ pub fn run() {
                         log::error!("Failed to load config: {:?}", err);
                     }
                 }
-                
+
                 let listener = Listener::new(state);
                 listener.start();
 
@@ -62,40 +50,41 @@ pub fn run() {
         .manage(state)
         .manage(Arc::new(Mutex::new(None::<Arc<AtomicBool>>)))
         .invoke_handler(tauri::generate_handler![
-            // config commands
-            load_config, //
-            get_history_configs,
-            delete_history_config,
-            get_default_configs,
-            get_history_dir,
-            config_remove_edge,
-            config_remove_node,
-            set_discovery_interval,
-            get_discovery_interval,
-            set_strict_mode,
-            get_strict_mode,
-            // network commands
-            start_network,
-            stop_network,
-            get_network_status,
-            get_network_nodes,
-            // simulation commands
-            crash_command,
-            send_set_pdr_command,
-            remove_neighbor,
-            add_neighbor,
-            get_graph,
-            start_repeated_sending,
-            stop_repeated_sending,
-            send_packet,
-            add_drone,
-            // stats
-            get_new_messages,
-            get_network_infos,
-            get_node_info,
-            get_overview_metrics,
-            get_drone_metrics,
-            get_host_metrics,
+            // config
+            crate::commands::config::load_config,
+            crate::commands::config::get_history_dir,
+            crate::commands::config::get_history_configs,
+            crate::commands::config::get_default_configs,
+            crate::commands::config::delete_history_config,
+            // controller
+            crate::commands::controller::crash_drone, // TODO: rimuoverlo ex crash_command,
+            crate::commands::controller::set_pdr,
+            crate::commands::controller::send_packet,
+            crate::commands::controller::start_repeated_sending,
+            crate::commands::controller::stop_repeated_sending,
+            // settings
+            crate::commands::settings::set_discovery_interval,
+            crate::commands::settings::get_discovery_interval,
+            crate::commands::settings::get_strict_mode,
+            crate::commands::settings::set_strict_mode,
+            // simulation
+            crate::commands::simulation::start_simulation,
+            crate::commands::simulation::get_simulation_status,
+            crate::commands::simulation::stop_simulation,
+            // topology
+            crate::commands::topology::remove_node,
+            crate::commands::topology::remove_edge,
+            // fix add_drone
+            crate::commands::topology::add_edge,
+            crate::commands::topology::get_graph, // da finire il refactoring
+            crate::commands::topology::get_network_nodes, // da finire il refactoring
+            // metrics
+            crate::commands::metrics::get_new_messages,
+            crate::commands::metrics::get_network_infos,
+            crate::commands::metrics::get_node_info,
+            crate::commands::metrics::get_overview_metrics,
+            crate::commands::metrics::get_drone_metrics,
+            crate::commands::metrics::get_host_metrics,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

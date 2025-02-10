@@ -83,7 +83,7 @@ export default function SendPacketForm() {
 
   // ─── SEND PACKET ─────────────────────────────────────────────────────────────
   const sendPacket = async (packet: any) => {
-    await invoke("send_packet", packet);
+    await invoke("send_packet", packet); // TODO: review this
   };
 
   // For a single packet we convert the hops from a comma-separated string to an array.

@@ -1,6 +1,5 @@
 use crate::error::NetworkError;
-use crate::network::state::GraphState;
-use log::debug;
+use crate::simulation::topology::{GraphState, NodeMetadata};
 use std::collections::HashSet;
 
 /// Validates the network graph according to the specified constraints.
@@ -13,7 +12,7 @@ use std::collections::HashSet;
 /// # Returns
 /// - `Ok(())` if the graph is valid.
 /// - `Err(NetworkError::ValidationError)` if the graph is invalid.
-pub(crate) fn validate_graph(graph: &GraphState, strict: bool) -> Result<(), NetworkError> {
+pub fn validate_graph(graph: &GraphState, strict: bool) -> Result<(), NetworkError> {
     validate_connected_graph(graph)?;
     validate_bidirectionality(graph)?;
     validate_no_multiple_connections(graph)?;
@@ -61,7 +60,8 @@ fn validate_bidirectionality(graph: &GraphState) -> Result<(), NetworkError> {
         for &neighbor in neighbors {
             if !graph
                 .adjacency
-                .get(&neighbor).is_some_and(|n| n.contains(node))
+                .get(&neighbor)
+                .is_some_and(|n| n.contains(node))
             {
                 return Err(NetworkError::ValidationError(format!(
                     "The graph is not bidirectional: {} -> {} exists, but not vice versa.",
@@ -93,9 +93,8 @@ fn validate_no_multiple_connections(graph: &GraphState) -> Result<(), NetworkErr
 /// and servers must have at least 2 connections to drones.
 fn validate_clients_and_servers(graph: &GraphState) -> Result<(), NetworkError> {
     for (node, meta) in &graph.node_info {
-        match meta.node_type {
-            crate::network::state::NodeType::Client => {
-                debug!("Validating client {}", node);
+        match meta {
+            NodeMetadata::Client => {
                 let neighbors = graph.adjacency.get(node).ok_or_else(|| {
                     NetworkError::ValidationError(format!(
                         "Client {} has no valid connections.",
@@ -104,20 +103,13 @@ fn validate_clients_and_servers(graph: &GraphState) -> Result<(), NetworkError> 
                 })?;
 
                 if neighbors.is_empty() || neighbors.len() > 2 {
-                    debug!(
-                        "Client {} has {} connections: {:?}",
-                        node,
-                        neighbors.len(),
-                        neighbors
-                    );
                     return Err(NetworkError::ValidationError(format!(
                         "Client {} must have 1 or 2 connections to drones.",
                         node
                     )));
                 }
             }
-            crate::network::state::NodeType::Server => {
-                debug!("Validating server {}", node);
+            NodeMetadata::Server => {
                 let neighbors = graph.adjacency.get(node).ok_or_else(|| {
                     NetworkError::ValidationError(format!(
                         "Server {} has no valid connections.",
@@ -156,22 +148,24 @@ fn validate_no_duplicate_ids(graph: &GraphState) -> Result<(), NetworkError> {
 /// Clients and servers cannot have direct connections to other clients or servers.
 fn validate_no_host_direct_connections(graph: &GraphState) -> Result<(), NetworkError> {
     for (node, meta) in &graph.node_info {
-        match &meta.node_type {
-            crate::network::state::NodeType::Client | crate::network::state::NodeType::Server => {
-                if let Some(neighbors) = graph.adjacency.get(node) {
-                    for &neighbor in neighbors {
-                        if matches!(
-                            graph.node_info.get(&neighbor).map(|m| &m.node_type),
-                            Some(
-                                crate::network::state::NodeType::Client
-                                    | crate::network::state::NodeType::Server
-                            )
-                        ) {
-                            return Err(NetworkError::ValidationError(format!(
-                                "Node {} (Client/Server) is directly connected to another Client/Server {}. Clients and Servers must be at the edges of the network.",
-                                node, neighbor
-                            )));
-                        }
+        match meta {
+            NodeMetadata::Client | NodeMetadata::Server => {
+                let neighbors = graph.adjacency.get(node).ok_or_else(|| {
+                    NetworkError::ValidationError(format!(
+                        "Client {} has no valid connections.",
+                        node
+                    ))
+                })?;
+
+                for &neighbor in neighbors {
+                    if matches!(
+                        graph.node_info.get(&neighbor),
+                        Some(NodeMetadata::Client) | Some(NodeMetadata::Server)
+                    ) {
+                        return Err(NetworkError::ValidationError(format!(
+                            "Node {} (Client/Server) is directly connected to another Client/Server {}. Clients and Servers must be at the edges of the network.",
+                            node, neighbor
+                        )));
                     }
                 }
             }
@@ -187,7 +181,7 @@ fn validate_network_connected_without_hosts(graph: &GraphState) -> Result<(), Ne
     let start_node = graph
         .node_info
         .iter()
-        .find(|(_, meta)| matches!(meta.node_type, crate::network::state::NodeType::Drone))
+        .find(|(_, meta)| matches!(meta, NodeMetadata::Drone(_)))
         .map(|(&id, _)| id);
 
     if start_node.is_none() {
@@ -208,8 +202,7 @@ fn validate_network_connected_without_hosts(graph: &GraphState) -> Result<(), Ne
         }
         if let Some(neighbors) = graph.adjacency.get(&node) {
             for &neighbor in neighbors {
-                // Ignore hosts (clients and servers)
-                if matches!(graph.node_info.get(&neighbor), Some(m) if matches!(m.node_type, crate::network::state::NodeType::Drone))
+                if matches!(graph.node_info.get(&neighbor), Some(m) if !matches!(m, NodeMetadata::Client | NodeMetadata::Server))
                 {
                     queue.push(neighbor);
                 }
@@ -221,7 +214,7 @@ fn validate_network_connected_without_hosts(graph: &GraphState) -> Result<(), Ne
     let drone_count = graph
         .node_info
         .values()
-        .filter(|meta| matches!(meta.node_type, crate::network::state::NodeType::Drone))
+        .filter(|meta| matches!(meta, NodeMetadata::Drone(_)))
         .count();
 
     if visited.len() == drone_count {

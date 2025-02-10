@@ -1,5 +1,5 @@
 use crate::error::NetworkError;
-use crate::network::state::NetworkState;
+use crate::simulation::state::SimulationState;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -8,71 +8,90 @@ use std::sync::Arc;
 use std::time::UNIX_EPOCH;
 use tauri::path::BaseDirectory;
 use tauri::{AppHandle, Manager, State};
-use wg_2024::network::NodeId;
 
+/// Represents a configuration file with metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigFile {
-    pub id: String,     // UUID univoco della configurazione
-    pub name: String,   // Nome file (unico)
-    pub path: String,   // Percorso salvato
-    pub timestamp: u64, // Data e ora di caricamento (UNIX timestamp)
+    pub id: String,     // Unique UUID of the configuration
+    pub name: String,   // Unique file name
+    pub path: String,   // Saved file path
+    pub timestamp: u64, // Timestamp of when it was loaded (UNIX timestamp)
 }
 
-/// Loads the configuration from a file and stores it in `state.initial_config`.
+/// Loads a configuration file and stores it in `state.initial_config`.
 #[tauri::command]
 pub fn load_config(
     path: String,
-    state: State<Arc<Mutex<NetworkState>>>,
+    state: State<Arc<Mutex<SimulationState>>>,
 ) -> Result<(), NetworkError> {
-    let mut net_state = state.lock();
-    net_state.load_config_from_file(&path)?;
+    let mut sim_state = state.lock();
+    sim_state.load_config_from_file(&path)?;
     Ok(())
 }
 
-pub fn get_default_configs_dir(app_handle: AppHandle) -> Result<PathBuf, NetworkError> {
-    app_handle
-        .path()
-        .resolve("resources/default_configs", BaseDirectory::Resource)
-        .map_err(|e| NetworkError::PathError(e.to_string()))
-}
-
+/// Retrieves the history directory path, creating it if it does not exist.
+///
+/// # Arguments
+///
+/// * `app_handle` - The application handle to resolve paths.
+///
+/// # Returns
+///
+/// * `Ok(PathBuf)` - The history directory path.
+/// * `Err(String)` - If the directory cannot be created or resolved.
 #[tauri::command]
-pub fn get_history_dir(app_handle: AppHandle) -> Result<PathBuf, String> {
+pub fn get_history_dir(app_handle: AppHandle) -> Result<PathBuf, NetworkError> {
     let history_dir = app_handle
         .path()
         .resolve("history", BaseDirectory::AppData)
-        .map_err(|e| format!("Errore nel recupero della directory AppData: {}", e))?;
+        .map_err(|e| NetworkError::PathError(e.to_string()))?;
 
-    // Crea la cartella se non esiste
     if !history_dir.exists() {
-        fs::create_dir_all(&history_dir)
-            .map_err(|e| format!("Errore nella creazione della directory: {}", e))?;
+        fs::create_dir_all(&history_dir).map_err(|e| NetworkError::PathError(e.to_string()))?;
     }
 
     Ok(history_dir)
 }
 
+/// Retrieves all historical configuration files.
+///
+/// # Arguments
+///
+/// * `app_handle` - The application handle.
+///
+/// # Returns
+///
+/// * `Ok(Vec<ConfigFile>)` - A list of historical configurations.
+/// * `Err(String)` - If an error occurs while reading the directory.
 #[tauri::command]
-pub fn get_history_configs(app_handle: tauri::AppHandle) -> Result<Vec<ConfigFile>, String> {
+pub fn get_history_configs(app_handle: AppHandle) -> Result<Vec<ConfigFile>, NetworkError> {
     let history_dir = get_history_dir(app_handle)?;
 
     let mut configs = Vec::new();
-    for entry in fs::read_dir(history_dir).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
+    for entry in fs::read_dir(history_dir).map_err(NetworkError::ConfigFileReadError)? {
+        let entry = entry.map_err(NetworkError::ConfigFileReadError)?;
         let path = entry.path();
 
         if path.is_file() {
-            let metadata = fs::metadata(&path).map_err(|e| e.to_string())?;
+            let metadata = fs::metadata(&path).map_err(NetworkError::ConfigFileReadError)?;
             let timestamp = metadata
                 .modified()
-                .map_err(|e| e.to_string())?
+                .map_err(NetworkError::ConfigFileReadError)?
                 .duration_since(UNIX_EPOCH)
                 .map(|d| d.as_secs())
                 .unwrap_or(0);
 
             configs.push(ConfigFile {
-                id: path.file_stem().unwrap().to_string_lossy().into_owned(),
-                name: path.file_name().unwrap().to_string_lossy().into_owned(),
+                id: path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .map(String::from)
+                    .ok_or_else(|| NetworkError::Other("Failed to parse file stem".into()))?,
+                name: path
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .map(String::from)
+                    .ok_or_else(|| NetworkError::Other("Failed to parse file name".into()))?,
                 path: path.to_string_lossy().into_owned(),
                 timestamp,
             });
@@ -83,18 +102,42 @@ pub fn get_history_configs(app_handle: tauri::AppHandle) -> Result<Vec<ConfigFil
     Ok(configs)
 }
 
+/// Retrieves all default configuration files.
+///
+/// # Arguments
+///
+/// * `app_handle` - The application handle.
+///
+/// # Returns
+///
+/// * `Ok(Vec<ConfigFile>)` - A list of default configurations.
+/// * `Err(NetworkError)` - If an error occurs while reading the directory.
 #[tauri::command]
-pub fn get_default_configs(app_handle: tauri::AppHandle) -> Result<Vec<ConfigFile>, String> {
-    let dir = get_default_configs_dir(app_handle).map_err(|e| e.to_string())?;
+pub fn get_default_configs(app_handle: AppHandle) -> Result<Vec<ConfigFile>, NetworkError> {
+    let dir = crate::simulation::configs::configs_handler::get_default_configs_dir(app_handle)
+        .map_err(|e| NetworkError::PathError(e.to_string()))?;
+
     let mut configs = Vec::new();
 
-    for entry in fs::read_dir(dir).map_err(|e| e.to_string())? {
-        let entry = entry.map_err(|e| e.to_string())?;
+    for entry in fs::read_dir(dir).map_err(NetworkError::ConfigFileReadError)? {
+        let entry = entry.map_err(NetworkError::ConfigFileReadError)?;
         let path = entry.path();
 
+        let id = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .map(String::from)
+            .ok_or_else(|| NetworkError::Other("Failed to parse file stem".into()))?;
+
+        let name = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .map(String::from)
+            .ok_or_else(|| NetworkError::Other("Failed to parse file name".into()))?;
+
         configs.push(ConfigFile {
-            id: path.file_stem().unwrap().to_string_lossy().into_owned(),
-            name: path.file_name().unwrap().to_string_lossy().into_owned(),
+            id,
+            name,
             path: path.to_string_lossy().into_owned(),
             timestamp: 0,
         });
@@ -103,111 +146,17 @@ pub fn get_default_configs(app_handle: tauri::AppHandle) -> Result<Vec<ConfigFil
     Ok(configs)
 }
 
+/// Deletes a configuration file from history.
+///
+/// # Arguments
+///
+/// * `file_path` - The path of the file to delete.
+///
+/// # Returns
+///
+/// * `Ok(())` - If the file is successfully deleted.
+/// * `Err(NetworkError)` - If an error occurs during deletion.
 #[tauri::command]
-pub fn delete_history_config(file_path: String) -> Result<(), String> {
-    fs::remove_file(&file_path).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-pub fn config_remove_node(
-    node_id: NodeId,
-    state: State<Arc<Mutex<NetworkState>>>,
-) -> Result<(), String> {
-    let mut net_state = state.lock();
-
-    if let Some(config) = &mut net_state.initial_config {
-        config.drone.retain(|d| d.id != node_id);
-        config.client.retain(|c| c.id != node_id);
-        config.server.retain(|s| s.id != node_id);
-
-        for drone in &mut config.drone {
-            drone.connected_node_ids.retain(|&id| id != node_id);
-        }
-        for client in &mut config.client {
-            client.connected_drone_ids.retain(|&id| id != node_id);
-        }
-        for server in &mut config.server {
-            server.connected_drone_ids.retain(|&id| id != node_id);
-        }
-
-        Ok(())
-    } else {
-        Err("No configuration loaded".to_string())
-    }
-}
-
-#[tauri::command]
-pub fn config_remove_edge(
-    node1_id: NodeId,
-    node2_id: NodeId,
-    state: State<Arc<Mutex<NetworkState>>>,
-) -> Result<(), String> {
-    let mut net_state = state.lock();
-
-    if let Some(config) = &mut net_state.initial_config {
-        for drone in &mut config.drone {
-            if drone.id == node1_id {
-                drone.connected_node_ids.retain(|&id| id != node2_id);
-            }
-            if drone.id == node2_id {
-                drone.connected_node_ids.retain(|&id| id != node1_id);
-            }
-        }
-
-        for client in &mut config.client {
-            if client.id == node1_id {
-                client.connected_drone_ids.retain(|&id| id != node2_id);
-            }
-            if client.id == node2_id {
-                client.connected_drone_ids.retain(|&id| id != node1_id);
-            }
-        }
-
-        for server in &mut config.server {
-            if server.id == node1_id {
-                server.connected_drone_ids.retain(|&id| id != node2_id);
-            }
-            if server.id == node2_id {
-                server.connected_drone_ids.retain(|&id| id != node1_id);
-            }
-        }
-
-        Ok(())
-    } else {
-        Err("No configuration loaded".to_string())
-    }
-}
-
-#[tauri::command]
-pub fn set_discovery_interval(
-    state: State<Arc<Mutex<NetworkState>>>,
-    interval: u64,
-) -> Result<(), String> {
-    let mut net_state = state.lock();
-    if interval == 0 {
-        net_state.discovery_interval = None;
-        return Ok(());
-    }
-    net_state.discovery_interval = Option::from(std::time::Duration::from_secs(interval));
-    Ok(())
-}
-
-#[tauri::command]
-pub fn get_discovery_interval(state: State<Arc<Mutex<NetworkState>>>) -> u64 {
-    let net_state = state.lock();
-    net_state
-        .discovery_interval
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
-}
-
-#[tauri::command]
-pub fn get_strict_mode(state: State<Arc<Mutex<NetworkState>>>) -> bool {
-    state.lock().get_strict_mode()
-}
-
-#[tauri::command]
-pub fn set_strict_mode(state: State<Arc<Mutex<NetworkState>>>, strict: bool) -> Result<(), String> {
-    state.lock().set_strict_mode(strict);
-    Ok(())
+pub fn delete_history_config(file_path: String) -> Result<(), NetworkError> {
+    fs::remove_file(&file_path).map_err(NetworkError::ConfigFileDeleteError)
 }

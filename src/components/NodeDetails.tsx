@@ -72,7 +72,7 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
   const addNeighbor = async () => {
     if (!newNeighbor.trim()) return;
     try {
-      await invoke("add_neighbor", { nodeId: Number(nodeId), neighborId: Number(newNeighbor) });
+      await invoke("add_edge", { node1Id: Number(nodeId), node2Id: Number(newNeighbor) });
       setNodeData((prev) =>
         prev ? { ...prev, connections: [...prev.connections, Number(newNeighbor)].sort((a, b) => a - b) } : prev
       );
@@ -92,7 +92,7 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
   // 📌 Remove a neighbor
   const removeNeighbor = async (neighborId: number) => {
     try {
-      await invoke("remove_neighbor", { nodeId: Number(nodeId), neighborId });
+      await invoke("remove_edge", { node1Id: Number(nodeId), node2Id: neighborId });
       setNodeData((prev) =>
         prev ? { ...prev, connections: prev.connections.filter((n) => n !== neighborId) } : prev
       );
@@ -111,7 +111,7 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
   // 📌 Crash a drone
   const crashNode = async () => {
     try {
-      await invoke("crash_command", { droneId: Number(nodeId) });
+      await invoke("remove_node", { nodeId: Number(nodeId) });
       toast.success(`Drone ${ nodeId } crashed`);
       refreshGraph();
       onClose();
@@ -129,7 +129,7 @@ const NodeDetails = ({ nodeId, onClose, refreshGraph }: NodeDetailsProps) => {
   // 📌 Update the PDR for drones
   const updatePdr = async (newPdr: number) => {
     try {
-      await invoke("send_set_pdr_command", { droneId: Number(nodeId), pdr: Math.round(newPdr * 100) });
+      await invoke("set_pdr", { droneId: Number(nodeId), pdr: Math.round(newPdr * 100) });
       setNodeData((prev) =>
         prev && prev.metrics.category === "Drone" ? { ...prev, metrics: { ...prev.metrics, pdr: newPdr } } : prev
       );

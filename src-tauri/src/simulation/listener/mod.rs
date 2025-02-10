@@ -1,4 +1,4 @@
-use crate::network::state::NetworkState;
+use crate::simulation::state::SimulationState;
 use crate::utils::ControllerEvent;
 use common_utils::HostEvent;
 use log::{debug, error, info};
@@ -11,15 +11,14 @@ use wg_2024::network::NodeId;
 use wg_2024::packet::{Packet, PacketType};
 
 pub struct Listener {
-    state: Arc<Mutex<NetworkState>>,
+    state: Arc<Mutex<SimulationState>>,
 }
 
 impl Listener {
-    pub fn new(state: Arc<Mutex<NetworkState>>) -> Self {
+    pub fn new(state: Arc<Mutex<SimulationState>>) -> Self {
         Self { state }
     }
 
-    /// Starts the listener thread.
     pub fn start(self) {
         info!("Starting listener thread");
         thread::spawn(move || loop {
@@ -30,7 +29,7 @@ impl Listener {
                 self.process_event(event);
             }
 
-            thread::sleep(Duration::from_millis(10)); // TODO: testare
+            thread::sleep(Duration::from_millis(10));
         });
     }
 
@@ -39,19 +38,21 @@ impl Listener {
         let mut events = Vec::new();
         let state_guard = self.state.lock();
 
-        for (&node_id, (_, drone_receiver)) in state_guard.drones_controller_channels.iter() {
+        for (&node_id, (_, drone_receiver)) in state_guard.get_drone_controller_channels().iter() {
             if let Ok(event) = drone_receiver.try_recv() {
                 events.push(ControllerEvent::Drone { node_id, event });
             }
         }
 
-        for (&node_id, (_, client_receiver)) in state_guard.client_controller_channels.iter() {
+        for (&node_id, (_, client_receiver)) in state_guard.get_client_controller_channels().iter()
+        {
             if let Ok(event) = client_receiver.try_recv() {
                 events.push(ControllerEvent::Host { node_id, event });
             }
         }
 
-        for (&node_id, (_, server_receiver)) in state_guard.server_controller_channels.iter() {
+        for (&node_id, (_, server_receiver)) in state_guard.get_server_controller_channels().iter()
+        {
             if let Ok(event) = server_receiver.try_recv() {
                 events.push(ControllerEvent::Host { node_id, event });
             }
@@ -63,8 +64,8 @@ impl Listener {
     /// Processes the event by updating the metrics or forwarding the packet if it's a shortcut.
     fn process_event(&self, event: ControllerEvent) {
         {
-            let mut state = self.state.lock();
-            state.received_messages.push(event.clone());
+            let mut sim_state = self.state.lock();
+            sim_state.get_received_messages_mut().push(event.clone());
         }
 
         match event {
@@ -79,21 +80,29 @@ impl Listener {
 
     /// Handles the events coming from the drones updating the metrics or forwarding the packet if it's a shortcut.
     fn handle_drone_event(&self, node_id: NodeId, event: DroneEvent) {
-        let mut state = self.state.lock();
+        let mut sim_state = self.state.lock();
         match event {
             DroneEvent::PacketSent(packet) => {
-                state.metrics.update_drone_packet_sent(node_id, &packet);
+                sim_state
+                    .get_metrics_mut()
+                    .update_drone_packet_sent(node_id, &packet);
             }
             DroneEvent::PacketDropped(packet) => {
-                state.metrics.update_drone_packet_dropped(node_id, &packet);
+                sim_state
+                    .get_metrics_mut()
+                    .update_drone_packet_dropped(node_id, &packet);
             }
             DroneEvent::ControllerShortcut(packet) => match packet.pack_type {
                 PacketType::Ack(_) | PacketType::Nack(_) | PacketType::FloodResponse(_) => {
-                    state.metrics.update_drone_packet_sent(node_id, &packet);
-                    if let Some(drone_metric) = state.metrics.drone_metrics.get_mut(&node_id) {
+                    sim_state
+                        .get_metrics_mut()
+                        .update_drone_packet_sent(node_id, &packet);
+                    if let Some(drone_metric) =
+                        sim_state.get_metrics_mut().drone_metrics.get_mut(&node_id)
+                    {
                         drone_metric.record_shortcut();
                     }
-                    drop(state); // TODO: check this
+                    drop(sim_state); // TODO: check this
                     self.send_packet_to_destination(packet);
                 }
                 _ => {
@@ -112,17 +121,17 @@ impl Listener {
         match event {
             HostEvent::HostMessageSent(destination, _message, duration) => {
                 state
-                    .metrics
+                    .get_metrics_mut()
                     .update_host_message_sent(node_id, destination, duration);
             }
             HostEvent::PacketSent(packet_header) => {
                 state
-                    .metrics
+                    .get_metrics_mut()
                     .update_host_packet_sent(node_id, packet_header);
             }
             HostEvent::ControllerShortcut(packet) => match packet.pack_type {
                 PacketType::Ack(_) | PacketType::Nack(_) | PacketType::FloodResponse(_) => {
-                    if let Some(host_metric) = state.metrics.host_metrics.get_mut(&node_id) {
+                    if let Some(host_metric) = state.get_metrics_mut().host_metrics.get_mut(&node_id) {
                         host_metric.record_shortcut();
                     }
                     self.send_packet_to_destination(packet);
@@ -141,7 +150,7 @@ impl Listener {
     fn send_packet_to_destination(&self, packet: Packet) {
         if let Some(dest_id) = packet.routing_header.destination() {
             let state = self.state.lock();
-            if let Some((sender, _)) = state.inter_node_channels.get(&dest_id) {
+            if let Some((sender, _)) = state.get_inter_node_channels().get(&dest_id) {
                 if let Err(err) = sender.send(packet) {
                     error!(
                         "[LISTENER] Failed to send packet to destination {}: {:?}",

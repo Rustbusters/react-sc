@@ -1,3 +1,5 @@
+pub mod configs_handler;
+
 use serde::Serialize;
 use wg_2024::config::Config;
 use wg_2024::network::NodeId;

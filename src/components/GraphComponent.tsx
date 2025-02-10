@@ -250,7 +250,7 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
         for (const node of selectedNodes) {
           const nodeId = node.id();
           console.log(`Removing node: ${ nodeId }`);
-          await invoke("config_remove_node", { nodeId: Number(nodeId) });
+          await invoke("remove_node", { nodeId: Number(nodeId) });
           removeGraphElement(nodeId, "node");
         }
         selectedNodes.unselect();
@@ -261,7 +261,7 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
           const source = edge.source().id();
           const target = edge.target().id();
           console.log(`Removing edge: ${ source } - ${ target }`);
-          await invoke("config_remove_edge", { node1Id: Number(source), node2Id: Number(target) });
+          await invoke("remove_edge", { node1Id: Number(source), node2Id: Number(target) });
           removeGraphElement(edge.id(), "edge");
         }
         selectedEdges.unselect();
@@ -351,7 +351,7 @@ const GraphComponent = ({ onNodeSelect, setRefreshGraph }: GraphComponentProps) 
   const handleAddDrone = async () => {
     try {
       const selectedNodes = Object.keys(connectedNodes).filter((id) => connectedNodes[id]);
-      const newDroneId = await invoke<number>("add_drone", {
+      const newDroneId = await invoke<number>("add_drone", { // TODO: finire questo
         connectedNodeIds: selectedNodes.map(Number),
         pdr: Number(pdr),
       });
